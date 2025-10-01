@@ -4,7 +4,7 @@ Study of color reconnection in WW->4q events at FCCee. Installing Pythia8 & Rive
 Clone repository from github
 
 ```
-git clone git@github.com:izamiza10/FCCee_WW_CR.git
+git clone git@github.com:izamiza10/WW_CR.git
 ```
 Install pythia & rivet. I have some example hepmc & yoda files generated for different Color reconnection (CR) schmes in ```HepMCExamples``` folder and programms used to generate the files can be found in ```PythiaPrograms```. Two simple rivet rountines can be found in ```rivet-ana```.
 
