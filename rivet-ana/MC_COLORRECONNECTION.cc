@@ -9,6 +9,8 @@
 #include "Rivet/Projections/ChargedFinalState.hh"
 //#include "Rivet/Logging.hh"
 
+#include <fstream>
+
 #include <string.h>
 
 /*
@@ -100,11 +102,83 @@ namespace Rivet {
       book(insideTotal, "Inside_W_Region", 24, -0.2, 1.2);
       book(OutsideTotal, "Outside_W_Region", 24, -0.2, 1.2);
       book(region_ratio, "Region_Ratio", 24, -0.2, 1.2);
+
+      out = new std::ofstream("outEventDisplay.csv");
     }
 
 
     /// Perform the per-event analysis
     void analyze(const Event& event) {
+
+    const HepMC3::GenEvent &ge = *event.genEvent();
+    //  Find hard-scatter W bosons
+    HepMC3::ConstGenParticlePtr Wp = nullptr;
+    HepMC3::ConstGenParticlePtr Wm = nullptr;
+
+    for (const auto &p : ge.particles()) {
+      if (abs(p->pid()) != 24)
+        continue;
+      if (!p->production_vertex())
+        continue;
+      bool prod_ee = true;
+      for (const auto &parent : p->production_vertex()->particles_in()) {
+        if (abs(parent->pid()) != 11) {
+          prod_ee = false;
+          break;
+        }
+      }
+      if (!prod_ee)
+        continue;
+
+      if (p->pid() == 24)
+        Wp = p;
+      if (p->pid() == -24)
+        Wm = p;
+    }
+    if (!Wp || !Wm)
+      return;
+
+    //  Get quarks from W decays
+    std::vector<Particle> WpQuarks, WmQuarks;
+
+    if (Wp->end_vertex()) {
+      for (const auto &q : Wp->end_vertex()->particles_out())
+        if (PID::isQuark(q->pid()))
+          WpQuarks.push_back(Particle(q));
+    }
+    if (Wm->end_vertex()) {
+      for (const auto &q : Wm->end_vertex()->particles_out())
+        if (PID::isQuark(q->pid()))
+          WmQuarks.push_back(Particle(q));
+    }
+    if (WpQuarks.size() != 2 || WmQuarks.size() != 2)
+      return;
+
+    //  Order Wp quarks by pT
+    if (WpQuarks[1].pT() > WpQuarks[0].pT())
+      std::swap(WpQuarks[0], WpQuarks[1]);
+
+    Particle q1 = WpQuarks[0];
+    Particle q2 = WpQuarks[1];
+
+    // Pick q3 based on mind dR to q1
+    double dR0 = deltaR(q1.momentum(), WmQuarks[0].momentum());
+    double dR1 = deltaR(q1.momentum(), WmQuarks[1].momentum());
+
+    Particle q3 = (dR0 < dR1 ? WmQuarks[0] : WmQuarks[1]);
+    Particle q4 = (dR0 < dR1 ? WmQuarks[1] : WmQuarks[0]);
+
+    // Setup 4-momentum
+    FourMomentum fv_q1(q1.E(), q1.px(), q1.py(), q1.pz());
+    FourMomentum fv_q2(q2.E(), q2.px(), q2.py(), q2.pz());
+    FourMomentum fv_q3(q3.E(), q3.px(), q3.py(), q3.pz());
+    FourMomentum fv_q4(q4.E(), q4.px(), q4.py(), q4.pz());
+    FourMomentum fv_Wp(Wp->momentum().e(), Wp->momentum().px(), Wp->momentum().py(), Wp->momentum().pz());
+    FourMomentum fv_Wm(Wm->momentum().e(), Wm->momentum().px(), Wm->momentum().py(), Wm->momentum().pz());
+   
+
+
+
       // Most inspiration taken from https://arxiv.org/pdf/0704.0597
       // Some plots that would be good to add:
       // A cutflow of what event selections are leading to events being removed
@@ -315,8 +389,6 @@ namespace Rivet {
       ordered_indices.push_back(minJetPair_1_jet1index);
       
       //Ok now ordered_indices should contain all jets in order clockwise
-      //Note: First two are from the same W, next 2 are the other W
-
       fastjet::PseudoJet correctJetPair1 = selectedJets[ordered_indices[0]] + selectedJets[ordered_indices[1]];
       fastjet::PseudoJet correctJetPair2 = selectedJets[ordered_indices[2]] + selectedJets[ordered_indices[3]];
 
@@ -325,6 +397,43 @@ namespace Rivet {
       _h_mult_after->fill(particles.size());
 
       //A quest for Figure 6
+
+      (*out) << "Event" << std::endl;
+
+      // Wp
+      (*out) << correctJetPair1.theta() << " " << correctJetPair1.phi() << " " << correctJetPair1.E() << "\n";
+      (*out) << fv_Wp.theta() << " " << fv_Wp.phi() << " " << fv_Wp.E() << "\n";
+      (*out) << fv_q1.theta() << " " << fv_q1.phi() << " " << fv_q1.E() << "\n";
+      (*out) << fv_q2.theta() << " " << fv_q2.phi() << " " << fv_q2.E() << "\n";
+      // Wm
+      (*out) << correctJetPair2.theta() << " " << correctJetPair2.phi() << " " << correctJetPair2.E() << "\n";
+      (*out) << fv_Wm.theta() << " " << fv_Wm.phi() << " " << fv_Wm.E() << "\n";
+      (*out) << fv_q3.theta() << " " << fv_q3.phi() << " " << fv_q3.E() << "\n";
+      (*out) << fv_q4.theta() << " " << fv_q4.phi() << " " << fv_q4.E() << "\n";
+      (*out) << "Jet1" << std::endl;
+      (*out) << "Constit1" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[0]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[0]].constituents()[i].theta() << " " << selectedJets[ordered_indices[0]].constituents()[i].phi() << " " << selectedJets[ordered_indices[0]].constituents()[i].e() << "\n";
+      }
+
+      (*out) << "Jet2" << std::endl;
+      (*out) << "Constit2" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[1]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[1]].constituents()[i].theta() << " " << selectedJets[ordered_indices[1]].constituents()[i].phi() << " " << selectedJets[ordered_indices[1]].constituents()[i].e() << "\n";
+      }
+
+      (*out) << "Jet3" << std::endl;
+      (*out) << "Constit3" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[2]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[2]].constituents()[i].theta() << " " << selectedJets[ordered_indices[2]].constituents()[i].phi() << " " << selectedJets[ordered_indices[2]].constituents()[i].e() << "\n";
+      }
+
+      (*out) << "Jet4" << std::endl;
+      (*out) << "Constit4" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[3]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[3]].constituents()[i].theta() << " " << selectedJets[ordered_indices[3]].constituents()[i].phi() << " " << selectedJets[ordered_indices[3]].constituents()[i].e() << "\n";
+      }
+
 
       for (int i = 0; i < 4; ++i) {
         
@@ -389,6 +498,10 @@ namespace Rivet {
           // Fill the ratio into the corresponding bin of region_ratio
           region_ratio->fillBin(i, ratio);
       } 
+/*
+      tree->Write();   //save new tree;
+      file->Write();
+*/
     }
 
     bool m_debug = false;
@@ -424,6 +537,9 @@ namespace Rivet {
     Histo1DPtr insideTotal;
     Histo1DPtr OutsideTotal;
     Histo1DPtr region_ratio;
+
+    std::ofstream* out;
+
   };
 
 
