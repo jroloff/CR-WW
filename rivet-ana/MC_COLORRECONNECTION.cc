@@ -7,6 +7,9 @@
 #include "Rivet/Projections/DirectFinalState.hh"
 #include "Rivet/Projections/VetoedFinalState.hh"
 #include "Rivet/Projections/ChargedFinalState.hh"
+#include "Rivet/Projections/FinalPartons.hh"
+#include "Rivet/Tools/ParticleIdUtils.hh"
+#include <fstream>
 //#include "Rivet/Logging.hh"
 
 #include <string.h>
@@ -88,10 +91,10 @@ namespace Rivet {
       book(_h_selectedJets, "selectedJets", 13, -0.5, 12.5); 
 
       //particle multiplicity before cuts
-      book(_h_mult_before, "PreMultiplicity", 150, -0.5, 150.5);   
+      book(_h_mult_before, "PreMultiplicity", 151, -0.5, 150.5);   
 
       //particle multiplicity after cuts
-      book(_h_mult_after, "PostMultiplicity", 150, -0.5, 150.5);
+      book(_h_mult_after, "PostMultiplicity", 151, -0.5, 150.5);
 
       //Figure 5
       book(phi_rescaled, "ParticleFlow_PhiRescaled", 84, -0.2, 4.2);
@@ -100,21 +103,59 @@ namespace Rivet {
       book(insideTotal, "Inside_W_Region", 24, -0.2, 1.2);
       book(OutsideTotal, "Outside_W_Region", 24, -0.2, 1.2);
       book(region_ratio, "Region_Ratio", 24, -0.2, 1.2);
+
+      //Diagnostic Plots
+      book(_h_mult_nocut, "Multiplicity_before_cuts", 150, -0.5, 150.5);
+      book(inside1, "inside1", 24, -0.2, 1.2);
+      book(inside2, "inside2", 24, -0.2, 1.2);
+      book(outside1, "outside1", 24, -0.2, 1.2);
+      book(outside2, "outside2", 24, -0.2, 1.2);
+      book(outside_ratio, "Outside_Ratio", 24, -0.2, 1.2);
+      book(inside_ratio, "Inside_Ratio", 24, -0.2, 1.2);
+
+      //Angle between each region
+      book(regionA, "Region_A", 72, -0.5, 180.5);
+      book(regionB, "Region_B", 72, -0.5, 180.5);
+      book(regionC, "Region_C", 72, -0.5, 180.5);
+      book(regionD, "Region_D", 72, -0.5, 180.5);
+
+      book(quark1, "Quark1_deltaR", 50, 0, 1.5);
+      book(quark2, "Quark2_deltaR", 50, 0, 1.5);
+      book(quark3, "Quark3_deltaR", 50, 0, 1.5);
+      book(quark4, "Quark4_deltaR", 50, 0, 1.5);
+
+      book(check_index, "check_index", 6, -1, 5);
+
+      book(jetToQuark1, "pT_Ratio_1", 50, 0, 7);
+      book(jetToQuark2, "pT_Ratio_2", 50, 0, 7);
+      book(jetToQuark3, "pT_Ratio_3", 50, 0, 7);
+      book(jetToQuark4, "pT_Ratio_4", 50, 0, 7);
+
+      book(quarkdR1, "quark_region_dR1", 50, 0, 1.5);
+      book(quarkdR2, "quark_region_dR2", 50, 0, 1.5);
+      book(quarkdR3, "quark_region_dR3", 50, 0, 1.5);
+      book(quarkdR4, "quark_region_dR4", 50, 0, 1.5);
+
+      //Using truth quarks
+      book(regionQA, "Quark_Region_A", 72, -0.5, 180.5);
+      book(regionQB, "Quark_Region_B", 72, -0.5, 180.5);
+      book(regionQC, "Quark_Region_C", 72, -0.5, 180.5);
+      book(regionQD, "Quark_Region_D", 72, -0.5, 180.5);
+
+      book(coorD2A, "Coorelation_Region_D2A", 72, -0.5, 100.5, 72, 99.5, 140.5);
+      book(coorD2B, "Coorelation_Region_D2B", 72, -0.5, 100.5, 72, -0.5, 100.5);
+      book(coorD2C, "Coorelation_Region_D2C", 72, -0.5, 100.5, 72, 99.5, 140.5);
+
+      book(regionratio_inv, "Inverse_Region_Ratio", 24, -0.2, 1.2);
+      
+
+      out = new std::ofstream("outEventDisplay.csv");
     }
 
 
     /// Perform the per-event analysis
     void analyze(const Event& event) {
       // Most inspiration taken from https://arxiv.org/pdf/0704.0597
-      // Some plots that would be good to add:
-      // A cutflow of what event selections are leading to events being removed
-      // A plot of the ycut of all durjet jets (before any cuts)
-      // A plot of the number of selected jets (before any cuts)
-      
-      // A plot of the particle multiplicity (before any cuts)
-      // A plot of the particle multiplicity (after all cuts)
-
-      // A plot like Figure 6 (will probably be challenging), for all 4 regions
 
       // Things we don't need right now, but might want later
       //double collisionE = sqrtS();
@@ -124,6 +165,8 @@ namespace Rivet {
       //All events
       //Use event.weight() maybe to normalize
       _h_cutflow->fill(1);
+
+      _h_mult_nocut->fill(particles.size());
 
       // Fastjet analysis - select algorithm and parameters
       fastjet::Strategy               strategy = fastjet::Best;
@@ -142,6 +185,7 @@ namespace Rivet {
 
       std::vector<fastjet::PseudoJet> selectedJets;
 
+      //ycut calculation
       for(unsigned int i=0; i<durjet.size(); i++){
         PseudoJet jj, j1, j2;
         jj = durjet[i];
@@ -226,8 +270,7 @@ namespace Rivet {
           //Collect the 4 remaining jet combinations and their angles
           jetIndices1.push_back(i);
           jetIndices2.push_back(j);
-          //jetMasses.push_back(jetPair1.m());
-          jetAngles.push_back( angleInDegrees);
+          jetAngles.push_back(angleInDegrees);
         }
       }
 
@@ -278,9 +321,6 @@ namespace Rivet {
       //cut if the jets don't fit expected geometry
       _h_cutflow->fill(5);
 
-      //fastjet::PseudoJet correctJetPair1 = selectedJets[index1] + selectedJets[index2];
-      //fastjet::PseudoJet correctJetPair2 = selectedJets[index3] + selectedJets[index4];
-
       //We're gonna try to ensure the jets are listed in clockwise order
       //The paper says that the interjet regions have the smallest angles, which we found.
       
@@ -324,7 +364,172 @@ namespace Rivet {
       _h_dijetMass2->fill(correctJetPair2.m());
       _h_mult_after->fill(particles.size());
 
+      //For checking proper ordering
+      check_index->fill(ordered_indices[0]);
+      check_index->fill(ordered_indices[1]);
+      check_index->fill(ordered_indices[2]);
+      check_index->fill(ordered_indices[3]);
+
+
+      //Parton Comparison Graph/ Truth particle analysis from Iza
+
+      const HepMC3::GenEvent &ge = *event.genEvent();
+      //  Find hard-scatter W bosons
+      HepMC3::ConstGenParticlePtr Wp = nullptr;
+      HepMC3::ConstGenParticlePtr Wm = nullptr;
+
+      for (const auto &p : ge.particles()) {
+        if (abs(p->pid()) != 24)
+          continue;
+        if (!p->production_vertex())
+          continue;
+        bool prod_ee = true;
+        for (const auto &parent : p->production_vertex()->particles_in()) {
+          if (abs(parent->pid()) != 11) {
+            prod_ee = false;
+            break;
+          }
+        }
+        if (!prod_ee)
+          continue;
+
+        if (p->pid() == 24)
+          Wp = p;
+        if (p->pid() == -24)
+          Wm = p;
+      }
+      if (!Wp || !Wm)
+        return;
+
+      //  Get quarks from W decays
+      std::vector<Particle> WpQuarks, WmQuarks;
+
+      if (Wp->end_vertex()) {
+        for (const auto &q : Wp->end_vertex()->particles_out())
+          if (PID::isQuark(q->pid()))
+            WpQuarks.push_back(Particle(q));
+      }
+      if (Wm->end_vertex()) {
+        for (const auto &q : Wm->end_vertex()->particles_out())
+          if (PID::isQuark(q->pid()))
+            WmQuarks.push_back(Particle(q));
+      }
+      if (WpQuarks.size() != 2 || WmQuarks.size() != 2)
+        return;
+
+      //Iza's ordering scheme
+      //  Order Wp quarks by pT
+      if (WpQuarks[1].pT() > WpQuarks[0].pT())
+        std::swap(WpQuarks[0], WpQuarks[1]);
+
+      Particle q1 = WpQuarks[0];
+      Particle q2 = WpQuarks[1];
+
+      // Pick q3 based on min dR to q1
+      double dR0 = deltaR(q1.momentum(), WmQuarks[0].momentum());
+      double dR1 = deltaR(q1.momentum(), WmQuarks[1].momentum());
+
+      Particle q3 = (dR0 < dR1 ? WmQuarks[0] : WmQuarks[1]);
+      Particle q4 = (dR0 < dR1 ? WmQuarks[1] : WmQuarks[0]);
+
+      //Added to match region graphs
+
+      // Setup 4-momentum
+      FourMomentum fv_q1(q1.E(), q1.px(), q1.py(), q1.pz());
+      FourMomentum fv_q2(q2.E(), q2.px(), q2.py(), q2.pz());
+      FourMomentum fv_q3(q3.E(), q3.px(), q3.py(), q3.pz());
+      FourMomentum fv_q4(q4.E(), q4.px(), q4.py(), q4.pz());
+      FourMomentum fv_Wp(Wp->momentum().e(), Wp->momentum().px(), Wp->momentum().py(), Wp->momentum().pz());
+      FourMomentum fv_Wm(Wm->momentum().e(), Wm->momentum().px(), Wm->momentum().py(), Wm->momentum().pz());
+
+      std::vector<FourMomentum> momentaList = {fv_q1, fv_q2, fv_q3, fv_q4, fv_q1};
+      double angleWpDeg = fv_q1.angle(fv_q2) * 180.0 / M_PI;
+      double angleWmDeg = fv_q3.angle(fv_q4) * 180.0 / M_PI;
+
+      if (angleWpDeg > 100.0 && angleWpDeg < 140.0 && angleWmDeg > 100.0 && angleWmDeg < 140.0) {
+        for (int i = 0; i < 4; ++i) {
+          double deg_theta = momentaList[i].angle(momentaList[i+1]) * 180/3.14;
+          if(i==0)
+            regionQA->fill(deg_theta);
+          if(i==1)
+            regionQB->fill(deg_theta);
+          if(i==2)
+            regionQC->fill(deg_theta);
+          if(i==3)
+            regionQD->fill(deg_theta);
+        }
+      }
+
+      //Now we need 4 histograms, one for each quark, comparing its deltaR to the jets
+      
+      std::vector<Histo1DPtr> histos = {quark1,quark2,quark3,quark4};
+      std::vector<Histo1DPtr> histosRatio = {jetToQuark1, jetToQuark2, jetToQuark3, jetToQuark4};
+      std::vector<Particle> truth_quarks = {q1,q2,q3,q4,q1};
+      std::vector<Histo1DPtr> quarkdR = {quarkdR1, quarkdR2, quarkdR3, quarkdR4};
+
+      for(int i = 0; i <4; ++i){
+        double deltaR2 = 1000;
+        for(int j = 0; j < 4; ++j){
+          FourMomentum loop = FourVector(selectedJets[j].E(), selectedJets[j].px() , selectedJets[j].py(), selectedJets[j].pz());
+          double deltaR1 = deltaR(truth_quarks[i].momentum(),loop);
+          if(deltaR1 < deltaR2)
+            deltaR2 = deltaR1;
+        }
+
+        histos[i]->fill(deltaR2);
+
+        //Checking ratio of quark pT to jet pT
+        for(int j = 0; j < 4; ++j){
+          FourMomentum loop = FourVector(selectedJets[j].E(), selectedJets[j].px() , selectedJets[j].py(), selectedJets[j].pz());
+          histosRatio[i]->fill(truth_quarks[i].pT()/loop.pT());
+        }
+        //Check dR between quarks
+        quarkdR[i]->fill(deltaR(truth_quarks[i],truth_quarks[i+1]));
+      }
+
       //A quest for Figure 6
+
+      //
+      (*out) << "Event" << std::endl;
+
+      // Wp
+      (*out) << correctJetPair1.theta() << " " << correctJetPair1.phi() << " " << correctJetPair1.E() << "\n";
+      (*out) << fv_Wp.theta() << " " << fv_Wp.phi() << " " << fv_Wp.E() << "\n";
+      (*out) << fv_q1.theta() << " " << fv_q1.phi() << " " << fv_q1.E() << "\n";
+      (*out) << fv_q2.theta() << " " << fv_q2.phi() << " " << fv_q2.E() << "\n";
+      // Wm
+      (*out) << correctJetPair2.theta() << " " << correctJetPair2.phi() << " " << correctJetPair2.E() << "\n";
+      (*out) << fv_Wm.theta() << " " << fv_Wm.phi() << " " << fv_Wm.E() << "\n";
+      (*out) << fv_q3.theta() << " " << fv_q3.phi() << " " << fv_q3.E() << "\n";
+      (*out) << fv_q4.theta() << " " << fv_q4.phi() << " " << fv_q4.E() << "\n";
+      (*out) << "Jet1" << std::endl;
+      (*out) << "Constit1" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[0]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[0]].constituents()[i].theta() << " " << selectedJets[ordered_indices[0]].constituents()[i].phi() << " " << selectedJets[ordered_indices[0]].constituents()[i].e() << "\n";
+      }
+
+      (*out) << "Jet2" << std::endl;
+      (*out) << "Constit2" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[1]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[1]].constituents()[i].theta() << " " << selectedJets[ordered_indices[1]].constituents()[i].phi() << " " << selectedJets[ordered_indices[1]].constituents()[i].e() << "\n";
+      }
+
+      (*out) << "Jet3" << std::endl;
+      (*out) << "Constit3" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[2]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[2]].constituents()[i].theta() << " " << selectedJets[ordered_indices[2]].constituents()[i].phi() << " " << selectedJets[ordered_indices[2]].constituents()[i].e() << "\n";
+      }
+
+      (*out) << "Jet4" << std::endl;
+      (*out) << "Constit4" << std::endl;
+      for(unsigned int i=0; i<selectedJets[ordered_indices[3]].constituents().size(); i++){
+        (*out) << selectedJets[ordered_indices[3]].constituents()[i].theta() << " " << selectedJets[ordered_indices[3]].constituents()[i].phi() << " " << selectedJets[ordered_indices[3]].constituents()[i].e() << "\n";
+      }
+
+      double angleA;
+      double angleB;
+      double angleC;
+      double angleD;
 
       for (int i = 0; i < 4; ++i) {
         
@@ -336,19 +541,41 @@ namespace Rivet {
         double nmag = n.mod();
         Vector3 unit_n = n / nmag;
 
+        //Calculate refrence jet angle
+        //double thetaRef = atan2(n.dot(unit_n), a.dot(b));
+        double thetaRef = a.angle(b);
+        double deg_theta = a.angle(b) * 180/3.14;
+
+        if(i==0)
+          angleA = deg_theta;
+        if(i==1)
+          angleB = deg_theta;
+        if(i==2)
+          angleC = deg_theta;
+        if(i==3)
+          angleD = deg_theta;
+
         //loop through all particles and see if its within the region
         for (const Particle& part : particles){
           Vector3 p(part.px(), part.py(), part.pz());
           Vector3 proj_p = p - unit_n * p.dot(unit_n);
 
           //Calculate angles with a as the reference jet
-          double thetaRef = atan2(a.cross(b).dot(unit_n), a.dot(b));
           double theta_p = atan2(a.cross(proj_p).dot(unit_n), a.dot(proj_p));
 
           //if its in the region, calculate a phi rescaled and fill
           if ((0 < theta_p && theta_p < thetaRef) || (0 > theta_p && theta_p > thetaRef)){
             double thetaRescaled = theta_p/thetaRef;
             phi_rescaled->fill(thetaRescaled+i);
+
+            if (i==0)
+              inside1->fill(thetaRescaled);
+            if (i==1)
+              outside1->fill(thetaRescaled);
+            if (i==2)
+              inside2->fill(thetaRescaled);
+            if (i==3)
+              outside2->fill(thetaRescaled);
 
             //Check if inside or outside region and fill cooresponding histo
             if (i == 0 || i == 2){
@@ -360,6 +587,15 @@ namespace Rivet {
           }
         }
       }
+      regionA->fill(angleA);
+      regionB->fill(angleB);
+      regionC->fill(angleC);
+      regionD->fill(angleD);
+
+      coorD2A->fill(angleD,angleA);
+      coorD2B->fill(angleD,angleB);
+      coorD2C->fill(angleD,angleC);
+ 
     }
 
     /// Normalise histograms etc., after the run
@@ -375,6 +611,21 @@ namespace Rivet {
       scale(insideTotal, 1.0 / sumOfWeights());
       scale(OutsideTotal, 1.0 / sumOfWeights());
 
+      //temporary to see inverse
+
+      //normalize(region_ratio);
+      /*
+      normalize(regionQA);
+      normalize(regionQB);
+      normalize(regionQC);
+      normalize(regionQD);
+
+      normalize(regionA);
+      normalize(regionB);
+      normalize(regionC);
+      normalize(regionD);
+      */
+
       //Find actual ratio for figure 6
 
       for (size_t i = 0; i < insideTotal->numBins(); ++i) {
@@ -388,7 +639,24 @@ namespace Rivet {
 
           // Fill the ratio into the corresponding bin of region_ratio
           region_ratio->fillBin(i, ratio);
+          //inverse regionratio
+          regionratio_inv->fillBin(i, 1-ratio);
       } 
+
+      for (unsigned int i = 0; i < inside1->numBins(); ++i) {
+        double inside1Value  = inside1->bin(i).sumW();
+        double inside2Value = inside2->bin(i).sumW();
+        double outside1Value = outside1->bin(i).sumW();
+        double outside2Value = outside2->bin(i).sumW();
+
+        // Compute the ratio safely
+        double in_ratio = (inside2Value != 0) ? inside1Value / inside2Value : 0;
+        double out_ratio = (outside2Value != 0) ? outside1Value / outside2Value : 0;
+
+        // Fill the ratio into the corresponding bin of region_ratio
+        inside_ratio->fillBin(i, in_ratio);
+        outside_ratio->fillBin(i, out_ratio);
+      }
     }
 
     bool m_debug = false;
@@ -424,6 +692,50 @@ namespace Rivet {
     Histo1DPtr insideTotal;
     Histo1DPtr OutsideTotal;
     Histo1DPtr region_ratio;
+
+    //Diagnostic plots
+    Histo1DPtr _h_mult_nocut;
+    Histo1DPtr outside_ratio;
+    Histo1DPtr inside_ratio;
+    Histo1DPtr inside1;
+    Histo1DPtr inside2;
+    Histo1DPtr outside1;
+    Histo1DPtr outside2;
+
+    Histo1DPtr regionA;
+    Histo1DPtr regionB;
+    Histo1DPtr regionC;
+    Histo1DPtr regionD;
+
+    Histo1DPtr quark1;
+    Histo1DPtr quark2;
+    Histo1DPtr quark3;
+    Histo1DPtr quark4;
+
+    Histo1DPtr check_index;
+
+    Histo1DPtr jetToQuark1;
+    Histo1DPtr jetToQuark2;
+    Histo1DPtr jetToQuark3;
+    Histo1DPtr jetToQuark4;
+
+    Histo1DPtr quarkdR1;
+    Histo1DPtr quarkdR2;
+    Histo1DPtr quarkdR3;
+    Histo1DPtr quarkdR4;
+
+    Histo1DPtr regionQA;
+    Histo1DPtr regionQB;
+    Histo1DPtr regionQC;
+    Histo1DPtr regionQD;
+
+    Histo2DPtr coorD2A;
+    Histo2DPtr coorD2B;
+    Histo2DPtr coorD2C;
+
+    Histo1DPtr regionratio_inv;
+
+    std::ofstream* out;
   };
 
 
