@@ -80,6 +80,9 @@ namespace Rivet {
       book(_h_dijetMass1, nameDijetMass1,  40, 0, 120);
       book(_h_dijetMass2, nameDijetMass2,  40, 0, 120);
 
+      book(quarkMassWm, "Wm_Quark_Mass",  40, 0, 120);
+      book(quarkMassWp, "Wp_Quark_Mass",  40, 0, 120);
+
       // One histogram for tracking what particles are left after cuts
       std::string cutflow = "Cutflow";
       book(_h_cutflow, cutflow, 5, 0.5, 5.5);
@@ -100,16 +103,19 @@ namespace Rivet {
       book(phi_rescaled, "ParticleFlow_PhiRescaled", 84, -0.2, 4.2);
 
       //Figure 6
-      book(insideTotal, "Inside_W_Region", 24, -0.2, 1.2);
-      book(OutsideTotal, "Outside_W_Region", 24, -0.2, 1.2);
-      book(region_ratio, "Region_Ratio", 24, -0.2, 1.2);
+      book(insideTotal, "Inside_W_Region", 36, -0.2, 1.2);
+      book(OutsideTotal, "Outside_W_Region", 36, -0.2, 1.2);
+      book(region_ratio, "Region_Ratio", 36, -0.2, 1.2);
 
       //Diagnostic Plots
       book(_h_mult_nocut, "Multiplicity_before_cuts", 150, -0.5, 150.5);
+
+      //ThetaRescaled for each region
       book(inside1, "inside1", 24, -0.2, 1.2);
       book(inside2, "inside2", 24, -0.2, 1.2);
       book(outside1, "outside1", 24, -0.2, 1.2);
       book(outside2, "outside2", 24, -0.2, 1.2);
+
       book(outside_ratio, "Outside_Ratio", 24, -0.2, 1.2);
       book(inside_ratio, "Inside_Ratio", 24, -0.2, 1.2);
 
@@ -123,6 +129,8 @@ namespace Rivet {
       book(quark2, "Quark2_deltaR", 50, 0, 1.5);
       book(quark3, "Quark3_deltaR", 50, 0, 1.5);
       book(quark4, "Quark4_deltaR", 50, 0, 1.5);
+
+      book(mismatchDeltaR, "Matching_DeltaR", 50, 0, 3);
 
       book(check_index, "check_index", 6, -1, 5);
 
@@ -142,11 +150,7 @@ namespace Rivet {
       book(regionQC, "Quark_Region_C", 72, -0.5, 180.5);
       book(regionQD, "Quark_Region_D", 72, -0.5, 180.5);
 
-      book(coorD2A, "Coorelation_Region_D2A", 72, -0.5, 100.5, 72, 99.5, 140.5);
-      book(coorD2B, "Coorelation_Region_D2B", 72, -0.5, 100.5, 72, -0.5, 100.5);
-      book(coorD2C, "Coorelation_Region_D2C", 72, -0.5, 100.5, 72, 99.5, 140.5);
-
-      book(regionratio_inv, "Inverse_Region_Ratio", 24, -0.2, 1.2);
+      book(sorted, "Sorted_particles", 13, -0.5, 12.5);
       
 
       out = new std::ofstream("outEventDisplay.csv");
@@ -432,6 +436,14 @@ namespace Rivet {
       Particle q3 = (dR0 < dR1 ? WmQuarks[0] : WmQuarks[1]);
       Particle q4 = (dR0 < dR1 ? WmQuarks[1] : WmQuarks[0]);
 
+      //Checking invariant mass of quarks
+
+      double massWp = (q1.momentum() + q2.momentum()).mass();
+      double massWm = (q3.momentum() + q4.momentum()).mass();
+
+      quarkMassWp -> fill(massWp);
+      quarkMassWm -> fill(massWm);
+
       //Added to match region graphs
 
       // Setup 4-momentum
@@ -469,14 +481,31 @@ namespace Rivet {
 
       for(int i = 0; i <4; ++i){
         double deltaR2 = 1000;
+        double matchedJetindex = -1;
+
+        //Finds smallest deltaR between a truth quark and any jet
         for(int j = 0; j < 4; ++j){
-          FourMomentum loop = FourVector(selectedJets[j].E(), selectedJets[j].px() , selectedJets[j].py(), selectedJets[j].pz());
+          FourMomentum loop = FourVector(selectedJets[indices[j]].E(), selectedJets[indices[j]].px() , selectedJets[indices[j]].py(), selectedJets[indices[j]].pz());
           double deltaR1 = deltaR(truth_quarks[i].momentum(),loop);
-          if(deltaR1 < deltaR2)
+          if(deltaR1 < deltaR2){
             deltaR2 = deltaR1;
+
+            //identify matchedJetindex with the jet paired to selectedJets[j]
+            if (j%2 == 0)
+              matchedJetindex = indices[j+1];
+            else
+              matchedJetindex = indices[j-1];
+          }
         }
 
         histos[i]->fill(deltaR2);
+
+        //for the first quark, we found the jet cooresponding to minimum delta R
+        //We then graph the deltaR of the other quark and jet
+        if (i==0){
+          FourMomentum matchedJet = FourVector(selectedJets[matchedJetindex].E(), selectedJets[matchedJetindex].px() , selectedJets[matchedJetindex].py(), selectedJets[matchedJetindex].pz());
+          mismatchDeltaR -> fill(deltaR(matchedJet,truth_quarks[1].momentum()));
+        }
 
         //Checking ratio of quark pT to jet pT
         for(int j = 0; j < 4; ++j){
@@ -487,8 +516,6 @@ namespace Rivet {
         quarkdR[i]->fill(deltaR(truth_quarks[i],truth_quarks[i+1]));
       }
 
-      //A quest for Figure 6
-
       //
       (*out) << "Event" << std::endl;
 
@@ -497,11 +524,17 @@ namespace Rivet {
       (*out) << fv_Wp.theta() << " " << fv_Wp.phi() << " " << fv_Wp.E() << "\n";
       (*out) << fv_q1.theta() << " " << fv_q1.phi() << " " << fv_q1.E() << "\n";
       (*out) << fv_q2.theta() << " " << fv_q2.phi() << " " << fv_q2.E() << "\n";
+
       // Wm
       (*out) << correctJetPair2.theta() << " " << correctJetPair2.phi() << " " << correctJetPair2.E() << "\n";
       (*out) << fv_Wm.theta() << " " << fv_Wm.phi() << " " << fv_Wm.E() << "\n";
       (*out) << fv_q3.theta() << " " << fv_q3.phi() << " " << fv_q3.E() << "\n";
       (*out) << fv_q4.theta() << " " << fv_q4.phi() << " " << fv_q4.E() << "\n";
+
+      //invariant mass
+      (*out) << massWp << " " << massWm << " " << correctJetPair1.m() << " " << correctJetPair2.m() << "\n";
+
+
       (*out) << "Jet1" << std::endl;
       (*out) << "Constit1" << std::endl;
       for(unsigned int i=0; i<selectedJets[ordered_indices[0]].constituents().size(); i++){
@@ -526,76 +559,102 @@ namespace Rivet {
         (*out) << selectedJets[ordered_indices[3]].constituents()[i].theta() << " " << selectedJets[ordered_indices[3]].constituents()[i].phi() << " " << selectedJets[ordered_indices[3]].constituents()[i].e() << "\n";
       }
 
+      //A quest for Figure 6
+
       double angleA;
       double angleB;
       double angleC;
       double angleD;
 
-      for (int i = 0; i < 4; ++i) {
-        
-        //First we will define a normal vector from a couple of 3 Vectors:
-        Vector3 a(selectedJets[ordered_indices[i]].px(), selectedJets[ordered_indices[i]].py(), selectedJets[ordered_indices[i]].pz());
-        Vector3 b(selectedJets[ordered_indices[i+1]].px(), selectedJets[ordered_indices[i+1]].py(), selectedJets[ordered_indices[i+1]].pz());
+      //So we see how much we are double counting or not counting particles in the sort
+      std::vector<int> particleSort(particles.size(), 0);
 
-        Vector3 n = a.cross(b);
-        double nmag = n.mod();
-        Vector3 unit_n = n / nmag;
+      //Calculating thetaRescaled for each particle and ensuring each is placed in 1 or less regions
+      for (unsigned int j = 0; j < particles.size(); j++){
+        std::vector<double> sorter(4,0);
+        std::vector<double> rescaledAngle(4,0);
+        Vector3 p(particles[j].px(), particles[j].py(), particles[j].pz());
 
-        //Calculate refrence jet angle
-        //double thetaRef = atan2(n.dot(unit_n), a.dot(b));
-        double thetaRef = a.angle(b);
-        double deg_theta = a.angle(b) * 180/3.14;
+        for (int i = 0; i < 4; ++i) {
+          //First we will define a normal vector from a couple of 3 Vectors:
+          Vector3 a(selectedJets[ordered_indices[i]].px(), selectedJets[ordered_indices[i]].py(), selectedJets[ordered_indices[i]].pz());
+          Vector3 b(selectedJets[ordered_indices[i+1]].px(), selectedJets[ordered_indices[i+1]].py(), selectedJets[ordered_indices[i+1]].pz());
 
-        if(i==0)
-          angleA = deg_theta;
-        if(i==1)
-          angleB = deg_theta;
-        if(i==2)
-          angleC = deg_theta;
-        if(i==3)
-          angleD = deg_theta;
+          Vector3 n = a.cross(b);
+          double nmag = n.mod();
+          Vector3 unit_n = n / nmag;
 
-        //loop through all particles and see if its within the region
-        for (const Particle& part : particles){
-          Vector3 p(part.px(), part.py(), part.pz());
+          //Calculate refrence jet angle
+          double thetaRef = atan2(n.dot(unit_n), a.dot(b));
+          double deg_theta = a.angle(b) * 180/3.14;
           Vector3 proj_p = p - unit_n * p.dot(unit_n);
+
+          if(j==0){
+            if(i==0)
+              angleA = deg_theta;
+            if(i==1)
+              angleB = deg_theta;
+            if(i==2)
+              angleC = deg_theta;
+            if(i==3)
+              angleD = deg_theta;
+          }
 
           //Calculate angles with a as the reference jet
           double theta_p = atan2(a.cross(proj_p).dot(unit_n), a.dot(proj_p));
+          //Find transverse momentum
+          double pT_to_plane = std::abs(p.dot(unit_n));
 
-          //if its in the region, calculate a phi rescaled and fill
+          //if its in the region, have sorter write it down
           if ((0 < theta_p && theta_p < thetaRef) || (0 > theta_p && theta_p > thetaRef)){
-            double thetaRescaled = theta_p/thetaRef;
-            phi_rescaled->fill(thetaRescaled+i);
-
-            if (i==0)
-              inside1->fill(thetaRescaled);
-            if (i==1)
-              outside1->fill(thetaRescaled);
-            if (i==2)
-              inside2->fill(thetaRescaled);
-            if (i==3)
-              outside2->fill(thetaRescaled);
-
-            //Check if inside or outside region and fill cooresponding histo
-            if (i == 0 || i == 2){
-              insideTotal->fill(thetaRescaled);
-            }
-            if (i == 1 || i == 3){
-              OutsideTotal->fill(thetaRescaled);
-            }
+            sorter[i] = pT_to_plane;
+            rescaledAngle[i] = (theta_p/thetaRef);
           }
         }
+
+        double minVal = 1000;
+        int jetNum = -1;
+        for(int k=0; k<4; ++k){
+          if(sorter[k]!=0 && minVal>sorter[k]){
+            minVal = sorter[k];
+            jetNum = k;
+          }
+        }
+
+        if(jetNum != -1){
+          particleSort[j]++;
+          phi_rescaled->fill(rescaledAngle[jetNum]+jetNum);
+
+          //Check if inside or outside region and fill cooresponding histo
+          if (jetNum == 0 || jetNum == 2){
+            insideTotal->fill(rescaledAngle[jetNum]);
+          }
+          if (jetNum == 1 || jetNum == 3){
+            OutsideTotal->fill(rescaledAngle[jetNum]);
+          }
+          //regionA
+          if (jetNum==0)
+            inside1->fill(rescaledAngle[jetNum]);
+          //RegionB
+          if (jetNum==1)
+            outside1->fill(rescaledAngle[jetNum]);
+          //RegionC
+          if (jetNum==2)
+            inside2->fill(rescaledAngle[jetNum]);
+          //RegionD
+          if (jetNum==3)
+            outside2->fill(rescaledAngle[jetNum]);
+        }
       }
+      //Angle in degrees between each jet
       regionA->fill(angleA);
       regionB->fill(angleB);
       regionC->fill(angleC);
       regionD->fill(angleD);
 
-      coorD2A->fill(angleD,angleA);
-      coorD2B->fill(angleD,angleB);
-      coorD2C->fill(angleD,angleC);
- 
+      for (int i = 0; i<particles.size(); i++){
+        sorted->fill(particleSort[i]);
+      }
     }
 
     /// Normalise histograms etc., after the run
@@ -611,21 +670,6 @@ namespace Rivet {
       scale(insideTotal, 1.0 / sumOfWeights());
       scale(OutsideTotal, 1.0 / sumOfWeights());
 
-      //temporary to see inverse
-
-      //normalize(region_ratio);
-      /*
-      normalize(regionQA);
-      normalize(regionQB);
-      normalize(regionQC);
-      normalize(regionQD);
-
-      normalize(regionA);
-      normalize(regionB);
-      normalize(regionC);
-      normalize(regionD);
-      */
-
       //Find actual ratio for figure 6
 
       for (size_t i = 0; i < insideTotal->numBins(); ++i) {
@@ -639,8 +683,6 @@ namespace Rivet {
 
           // Fill the ratio into the corresponding bin of region_ratio
           region_ratio->fillBin(i, ratio);
-          //inverse regionratio
-          regionratio_inv->fillBin(i, 1-ratio);
       } 
 
       for (unsigned int i = 0; i < inside1->numBins(); ++i) {
@@ -674,6 +716,10 @@ namespace Rivet {
     //std::vector<Histo1DPtr> _h_dijetMasses;
     Histo1DPtr _h_dijetMass1;
     Histo1DPtr _h_dijetMass2;
+
+    Histo1DPtr quarkMassWm;
+    Histo1DPtr quarkMassWp;
+
     //Same thing, std::vector<Histo1DPtr> _h_cutflow;
     Histo1DPtr _h_cutflow;
     //ycut before event cuts
@@ -712,6 +758,8 @@ namespace Rivet {
     Histo1DPtr quark3;
     Histo1DPtr quark4;
 
+    Histo1DPtr mismatchDeltaR;
+
     Histo1DPtr check_index;
 
     Histo1DPtr jetToQuark1;
@@ -729,11 +777,12 @@ namespace Rivet {
     Histo1DPtr regionQC;
     Histo1DPtr regionQD;
 
-    Histo2DPtr coorD2A;
-    Histo2DPtr coorD2B;
-    Histo2DPtr coorD2C;
+    Histo1DPtr region_a_thetaRescaled;
+    Histo1DPtr region_b_thetaRescaled;
+    Histo1DPtr region_c_thetaRescaled;
+    Histo1DPtr region_d_thetaRescaled;
 
-    Histo1DPtr regionratio_inv;
+    Histo1DPtr sorted;
 
     std::ofstream* out;
   };
