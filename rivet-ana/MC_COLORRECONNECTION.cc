@@ -528,7 +528,7 @@ namespace Rivet {
       // Jets 2-3 form region B (smallest angle, which must be from minJetPair_1 by definition)
       // Jets 3-4 form region C (second-largest angle)
       // Jets 4-1 form region D (second-smallest angle, which must be from minJetPair_2 by definition)
-      std::cout << "\t\t\t\t\t\t " << angle2_1 << "\t" << angle2_2 <<"\t" << angle1_1 << "\t" << angle1_2 << "\t" << minJetAngle1  << "\t" << minJetAngle2 << std::endl;
+      //std::cout << "\t\t\t\t\t\t " << angle2_1 << "\t" << angle2_2 <<"\t" << angle1_1 << "\t" << angle1_2 << "\t" << minJetAngle1  << "\t" << minJetAngle2 << std::endl;
       if(sumAngles1 > sumAngles2){
         if(angle1_2 > angle1_1){
           index2 = minJetPair_1_jet2index;
@@ -567,7 +567,7 @@ namespace Rivet {
           //}
         }
         else{
-          std::cout << "D" << std::endl;
+          //std::cout << "D" << std::endl;
           //std::cout << "\t\t\t\t\t\t " << angle2_1 << "\t" << angle2_2 <<"\t" << angle1_1 << "\t" << angle1_2 << "\t" << minJetAngle1  << "\t" << minJetAngle2 << std::endl;
           index2 = minJetPair_1_jet1index;
           index3 = minJetPair_1_jet2index;
