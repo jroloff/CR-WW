@@ -96,8 +96,19 @@ namespace Rivet {
       //particle multiplicity after cuts
       book(_h_mult_after, "PostMultiplicity", 151, -0.5, 150.5);
 
+      //Diagnostic Plots
+      book(_h_mult_nocut, "Multiplicity_before_cuts", 151, -0.5, 150.5);
+
       //Figure 5
       book(phi_rescaled, "ParticleFlow_PhiRescaled", 84, -0.2, 4.2);
+
+      book(orderingChoice, "orderingChoice", 4, -0.5, 3.5);
+      book(orderingChoice_allMatched, "orderingChoice_allMatched", 4, -0.5, 3.5);
+      book(isMatched, "isMatched", 2, -0.5, 1.5);
+
+      book(mismatchDeltaR, "Matching_DeltaR", 50, 0, 3);
+      book(check_index, "check_index", 6, -1, 5);
+      book(sorted, "Sorted_particles", 13, -0.5, 12.5);
 
       //Figure 6
       book(insideTotal, "Inside_W_Region", 20, 0, 1.);
@@ -108,67 +119,153 @@ namespace Rivet {
       book(outsideTotal_allMatched, "Outside_W_Region_allMatched", 20, 0, 1.);
       book(region_ratio_allMatched, "Region_Ratio_allMatched");
 
-      //Diagnostic Plots
-      book(_h_mult_nocut, "Multiplicity_before_cuts", 151, -0.5, 150.5);
-
       //ThetaRescaled for each region
       book(inside1, "inside1", 24, 0.0, 1.0);
       book(inside2, "inside2", 24, 0.0, 1.0);
       book(outside1, "outside1", 24, 0.0, 1.0);
       book(outside2, "outside2", 24, 0.0, 1.0);
+      book(outside_ratio, "Outside_Ratio");
+      book(inside_ratio, "Inside_Ratio");
 
       book(inside1_allMatched, "inside1_allMatched", 24, 0.0, 1.0);
       book(inside2_allMatched, "inside2_allMatched", 24, 0.0, 1.0);
       book(outside1_allMatched, "outside1_allMatched", 24, 0.0, 1.0);
       book(outside2_allMatched, "outside2_allMatched", 24, 0.0, 1.0);
-
-      book(outside_ratio, "Outside_Ratio");
-      book(inside_ratio, "Inside_Ratio");
-
       book(outside_ratio_allMatched, "Outside_Ratio_allMatched");
       book(inside_ratio_allMatched, "Inside_Ratio_allMatched");
 
-      book(orderingChoice, "orderingChoice", 4, -0.5, 3.5);
-      book(orderingChoice_allMatched, "orderingChoice_allMatched", 4, -0.5, 3.5);
-      book(isMatched, "isMatched", 2, -0.5, 1.5);
+      std::vector<std::string> regionNames = {"A", "B", "C", "D"};
+      for(unsigned int i=0; i<4; i++){
+        Histo1DPtr region;
+        book(region, "Region_"+ regionNames[i], 72, -0.5, 180.5);
+        regions.push_back(region);
 
-      //Angle between each region
-      book(regionA, "Region_A", 72, -0.5, 180.5);
-      book(regionB, "Region_B", 72, -0.5, 180.5);
-      book(regionC, "Region_C", 72, -0.5, 180.5);
-      book(regionD, "Region_D", 72, -0.5, 180.5);
-      regions = {regionA, regionB, regionC, regionD};
+        Histo1DPtr quark;
+        book(quark, "Quark1_deltaR_"+ to_string( i), 50, 0, 1.5);
+        histos.push_back(quark);
 
-      book(quark1, "Quark1_deltaR", 50, 0, 1.5);
-      book(quark2, "Quark2_deltaR", 50, 0, 1.5);
-      book(quark3, "Quark3_deltaR", 50, 0, 1.5);
-      book(quark4, "Quark4_deltaR", 50, 0, 1.5);
-      histos = {quark1,quark2,quark3,quark4};
+        Histo1DPtr jetToQuark;
+        book(jetToQuark, "pT_Ratio_"+ to_string( i), 100, 0, 3);
+        histosRatio.push_back(jetToQuark);
 
-      book(mismatchDeltaR, "Matching_DeltaR", 50, 0, 3);
 
-      book(check_index, "check_index", 6, -1, 5);
+        Histo1DPtr quarkDelta;
+        book(quarkDelta, "quark_region_dR" + to_string(i), 50, 0, 1.5);
+        quarkdR.push_back(quarkDelta);
 
-      book(jetToQuark1, "pT_Ratio_1", 100, 0, 3);
-      book(jetToQuark2, "pT_Ratio_2", 100, 0, 3);
-      book(jetToQuark3, "pT_Ratio_3", 100, 0, 3);
-      book(jetToQuark4, "pT_Ratio_4", 100, 0, 3);
-      histosRatio = {jetToQuark1, jetToQuark2, jetToQuark3, jetToQuark4};
+        Histo1DPtr regionQ;
+        book(regionQ, "Quark_Region_" + regionNames[i], 72, -0.5, 180.5);
+        regionsQ.push_back(regionQ);
 
-      book(quarkdR1, "quark_region_dR1", 50, 0, 1.5);
-      book(quarkdR2, "quark_region_dR2", 50, 0, 1.5);
-      book(quarkdR3, "quark_region_dR3", 50, 0, 1.5);
-      book(quarkdR4, "quark_region_dR4", 50, 0, 1.5);
-      quarkdR = {quarkdR1, quarkdR2, quarkdR3, quarkdR4};
+        Histo1DPtr jetPt;
+        book(jetPt, "jetPt_" + to_string(i), 50, 0, 150);
+        jetPts.push_back(jetPt);
 
-      //Using truth quarks
-      book(regionQA, "Quark_Region_A", 72, -0.5, 180.5);
-      book(regionQB, "Quark_Region_B", 72, -0.5, 180.5);
-      book(regionQC, "Quark_Region_C", 72, -0.5, 180.5);
-      book(regionQD, "Quark_Region_D", 72, -0.5, 180.5);
-      regionsQ = {regionQA, regionQB, regionQC, regionQD};
+        Histo1DPtr jetTheta;
+        book(jetTheta, "jetTheta_" + to_string(i), 50, 0, 180);
+        jetThetas.push_back(jetTheta);
+      }
 
-      book(sorted, "Sorted_particles", 13, -0.5, 12.5);
+
+
+      // Breakdown of plots by which jets are paired
+      for(unsigned int j=0; j<4; j++){
+        //Figure 6
+        Histo1DPtr insideTotalTmp;
+        book(insideTotalTmp, "Inside_W_Region_Pairing_" + to_string(j), 20, 0, 1.);
+        insideTotal_byPairing.push_back(insideTotalTmp);
+
+        Histo1DPtr outsideTotalTmp;
+        book(outsideTotalTmp, "Outside_W_Region_Pairing_" + to_string(j), 20, 0, 1.);
+        outsideTotal_byPairing.push_back(outsideTotalTmp);
+
+        Scatter2DPtr region_ratioTmp;
+        book(region_ratioTmp, "Region_Ratio_Pairing_" + to_string(j));
+        region_ratio_byPairing.push_back(region_ratioTmp);
+  
+        Histo1DPtr insideTotal_allMatchedTmp;
+        book(insideTotal_allMatchedTmp, "Inside_W_Region_allMatched_Pairing_" + to_string(j), 20, 0, 1.);
+        insideTotal_allMatched_byPairing.push_back(insideTotal_allMatchedTmp);
+ 
+        Histo1DPtr outsideTotal_allMatchedTmp;
+        book(outsideTotal_allMatchedTmp, "Outside_W_Region_allMatched_Pairing_" + to_string(j), 20, 0, 1.);
+        outsideTotal_allMatched_byPairing.push_back(outsideTotal_allMatchedTmp);
+ 
+        Scatter2DPtr region_ratio_allMatchedTmp;
+        book(region_ratio_allMatchedTmp, "Region_Ratio_allMatched_Pairing_" + to_string(j));
+        region_ratio_allMatched_byPairing.push_back(region_ratio_allMatchedTmp);
+  
+        //ThetaRescaled for each region
+        Histo1DPtr inside1Tmp;
+        book(inside1Tmp, "inside1_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        inside1_byPairing.push_back(inside1Tmp);
+
+
+        Histo1DPtr inside2Tmp;
+        book(inside2Tmp, "inside2_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        inside2_byPairing.push_back(inside2Tmp);
+
+        Histo1DPtr outside1Tmp;
+        book(outside1Tmp, "outside1_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        outside1_byPairing.push_back(outside1Tmp);
+
+        Histo1DPtr outside2Tmp;
+        book(outside2Tmp, "outside2_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        outside2_byPairing.push_back(outside2Tmp);
+
+        Scatter2DPtr outside_ratioTmp;
+        book(outside_ratioTmp, "Outside_Ratio_Pairing_" + to_string(j));
+        outside_ratio_byPairing.push_back(outside_ratioTmp);
+
+        Scatter2DPtr inside_ratioTmp;
+        book(inside_ratioTmp, "Inside_Ratio_Pairing_" + to_string(j));
+        inside_ratio_byPairing.push_back(inside_ratioTmp);
+
+        Histo1DPtr inside1_allMatchedTmp;
+        book(inside1_allMatchedTmp, "inside1_allMatched_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        inside1_allMatched_byPairing.push_back(inside1_allMatchedTmp);
+
+        Histo1DPtr inside2_allMatchedTmp;
+        book(inside2_allMatchedTmp, "inside2_allMatched_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        inside2_allMatched_byPairing.push_back(inside2_allMatchedTmp);
+
+        Histo1DPtr outside1_allMatchedTmp;
+        book(outside1_allMatchedTmp, "outside1_allMatched_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        outside1_allMatched_byPairing.push_back(outside1_allMatchedTmp);
+
+        Histo1DPtr outside2_allMatchedTmp;
+        book(outside2_allMatchedTmp, "outside2_allMatched_Pairing_" + to_string(j), 24, 0.0, 1.0);
+        outside2_allMatched_byPairing.push_back(outside2_allMatchedTmp);
+
+        Scatter2DPtr outside_ratio_allMatchedTmp;
+        book(outside_ratio_allMatchedTmp, "Outside_Ratio_allMatched_Pairing_" + to_string(j));
+        outside_ratio_allMatched_byPairing.push_back(outside_ratio_allMatchedTmp);
+
+        Scatter2DPtr inside_ratio_allMatchedTmp;
+        book(inside_ratio_allMatchedTmp, "Inside_Ratio_allMatched_Pairing_" + to_string(j));
+        inside_ratio_allMatched_byPairing.push_back(inside_ratio_allMatchedTmp);
+
+        std::vector<Histo1DPtr> regionsTmp, jetPtsTmp, jetThetasTmp;
+        for(unsigned int i=0; i<4; i++){
+          Histo1DPtr region;
+          book(region, "Region_"+ regionNames[i] + "_Pairing_"+to_string(j), 72, -0.5, 180.5);
+          regionsTmp.push_back(region);
+  
+          Histo1DPtr jetPt;
+          book(jetPt, "jetPt_" + to_string(i) + "_Pairing_"+to_string(j), 50, 0, 150);
+          jetPtsTmp.push_back(jetPt);
+  
+          Histo1DPtr jetTheta;
+          book(jetTheta, "jetTheta_" + to_string(i) + "_Pairing_"+to_string(j), 50, 0, 180);
+          jetThetasTmp.push_back(jetTheta);
+        }
+        regions_byPairing.push_back(regionsTmp);
+        jetPts_byPairing.push_back(jetPtsTmp);
+        jetThetas_byPairing.push_back(jetThetasTmp);
+      }
+
+
+
 
       out = new std::ofstream("outEventDisplay.csv");
 
@@ -508,6 +605,7 @@ namespace Rivet {
 
       // Two options for non-adjacent jet pairings, once we have selected the jets that make regions B and D
       // j1_1 j2_1, j1_2 j2_2
+      // The higher pT jets in each pairing are closer?
       double angle1_1 = getAngleInDegrees(jet4mom[minJetPair_1_jet1index].angle(jet4mom[minJetPair_2_jet1index]));
       double angle1_2 = getAngleInDegrees(jet4mom[minJetPair_1_jet2index].angle(jet4mom[minJetPair_2_jet2index]));
       double sumAngles1 = (angle1_1 > 100 && angle1_1 < 140 && angle1_2 > 100 && angle1_2 < 140)? angle1_1 + angle1_2:0;
@@ -521,6 +619,7 @@ namespace Rivet {
       if(sumAngles1==0 && sumAngles2==0) vetoEvent;
       //cut if the jets don't fit expected geometry
       _h_cutflow->fill(5);
+      int pairing = -1;
 
       int index1, index2, index3, index4;
       // Use the pairing based on the larger sum of angles
@@ -528,27 +627,20 @@ namespace Rivet {
       // Jets 2-3 form region B (smallest angle, which must be from minJetPair_1 by definition)
       // Jets 3-4 form region C (second-largest angle)
       // Jets 4-1 form region D (second-smallest angle, which must be from minJetPair_2 by definition)
-      //std::cout << "\t\t\t\t\t\t " << angle2_1 << "\t" << angle2_2 <<"\t" << angle1_1 << "\t" << angle1_2 << "\t" << minJetAngle1  << "\t" << minJetAngle2 << std::endl;
       if(sumAngles1 > sumAngles2){
         if(angle1_2 > angle1_1){
+          pairing = 0;
           index2 = minJetPair_1_jet2index;
           index3 = minJetPair_1_jet1index;
           index4 = minJetPair_2_jet1index;
           index1 = minJetPair_2_jet2index;
-          orderingChoice->fill(0);
-          //if(allJetsMatched){
-          //  orderingChoice_allMatched->fill(0);
-          //}
         }
         else{
+          pairing = 1;
           index2 = minJetPair_1_jet1index;
           index3 = minJetPair_1_jet2index;
           index4 = minJetPair_2_jet2index;
           index1 = minJetPair_2_jet1index;
-          orderingChoice->fill(1);
-          //if(allJetsMatched){
-          //  orderingChoice_allMatched->fill(1);
-          //}
         }
       }
       else{
@@ -557,28 +649,22 @@ namespace Rivet {
         // I have not been able to figure out why though.
 
         if(angle2_2 > angle2_1){
+          pairing = 2;
           index2 = minJetPair_1_jet2index;
           index3 = minJetPair_1_jet1index;
           index4 = minJetPair_2_jet2index;
           index1 = minJetPair_2_jet1index;
-          orderingChoice->fill(2);
-          //if(allJetsMatched){
-          //  orderingChoice_allMatched->fill(2);
-          //}
         }
         else{
-          //std::cout << "D" << std::endl;
-          //std::cout << "\t\t\t\t\t\t " << angle2_1 << "\t" << angle2_2 <<"\t" << angle1_1 << "\t" << angle1_2 << "\t" << minJetAngle1  << "\t" << minJetAngle2 << std::endl;
+          pairing = 3;
           index2 = minJetPair_1_jet1index;
           index3 = minJetPair_1_jet2index;
           index4 = minJetPair_2_jet1index;
           index1 = minJetPair_2_jet2index;
-          orderingChoice->fill(3);
-          //if(allJetsMatched){
-          //  orderingChoice_allMatched->fill(3);
-          //}
         }
       }
+      if(pairing < 0) vetoEvent;
+      std::cout << pairing << std::endl;
       // We have passed the full cutflow now
 
       // We have already ordered them, so we don't need to do this again
@@ -600,31 +686,10 @@ namespace Rivet {
           if((matchTo[ordered_indices[1]]==0 && matchTo[ordered_indices[0]] !=1 )|| (matchTo[ordered_indices[1]]==2 && matchTo[ordered_indices[0]] !=3 )) allJetsMatched = false;
       }
 
-      if(sumAngles1 > sumAngles2){
-        if(angle1_2 > angle1_1){
-          if(allJetsMatched){
-            orderingChoice_allMatched->fill(0);
-          }
-        }
-        else{
-          if(allJetsMatched){
-            orderingChoice_allMatched->fill(1);
-          }
-        }
+      orderingChoice->fill(pairing);
+      if(allJetsMatched){
+        orderingChoice_allMatched->fill(pairing);
       }
-      else{
-        if(angle2_2 > angle2_1){
-          if(allJetsMatched){
-            orderingChoice_allMatched->fill(2);
-          }
-        }
-        else{
-          if(allJetsMatched){
-            orderingChoice_allMatched->fill(3);
-          }
-        }
-      }
-
 
 
       _h_dijetMass1->fill(correctJetPair1.m());
@@ -635,6 +700,7 @@ namespace Rivet {
       }
       _h_mult_after->fill(particles.size());
 
+      //vetoEvent;
 
       isMatched->fill(allJetsMatched);
 
@@ -654,8 +720,6 @@ namespace Rivet {
 
           //Calculate reference jet angle
           double thetaRef = atan2(n.dot(unit_n), a.dot(b));
-          //double thetaRef = a.angle(b);
-          //std::cout << thetaRef << "\t" << a.angle(b) << std::endl;
 
           a_vec.push_back(a);
           unit_n_vec.push_back(unit_n); 
@@ -663,6 +727,11 @@ namespace Rivet {
 
           double deg_theta = getAngleInDegrees(a.angle(b));
           regions[i]->fill(deg_theta);
+          jetPts[i]->fill(jet4mom[i].pt());
+          jetThetas[i]->fill(getAngleInDegrees(jet4mom[i].theta()));
+          regions_byPairing[pairing][i]->fill(deg_theta);
+          jetPts_byPairing[pairing][i]->fill(jet4mom[i].pt());
+          jetThetas_byPairing[pairing][i]->fill(getAngleInDegrees(jet4mom[i].theta()));
       }  
 
       //A quest for Figure 6
@@ -684,8 +753,6 @@ namespace Rivet {
 
           //Calculate angles with a as the reference jet
           double theta_p = atan2(a_vec[i].cross(proj_p).dot(unit_n_vec[i]), a_vec[i].dot(proj_p));
-          //double theta_p = a_vec[i].angle(proj_p);
-          //std::cout << theta_p << "\t" << atan2(a_vec[i].cross(proj_p).dot(unit_n_vec[i]), a_vec[i].dot(proj_p)) << std::endl;
 
           //Find transverse momentum 
           double pT_to_plane = std::abs(p.dot(unit_n_vec[i]));
@@ -694,6 +761,7 @@ namespace Rivet {
           if ( (0 < theta_p && theta_p < thetaRef_vec[i])){
             sorter[i] = pT_to_plane;
             rescaledAngle[i] = (theta_p/thetaRef_vec[i]);
+            particleSort[j]++;
           }
         }
 
@@ -709,7 +777,6 @@ namespace Rivet {
         }
         if(jetNum ==-1) continue;
 
-        particleSort[j]++;
         phi_rescaled->fill(bestRescaledAngle+jetNum);
 
         //Check if inside or outside region and fill corresponding histo
@@ -717,36 +784,52 @@ namespace Rivet {
         if (jetNum==0){
           inside1->fill(bestRescaledAngle);
           insideTotal->fill(bestRescaledAngle);
+          inside1_byPairing[pairing]->fill(bestRescaledAngle);
+          insideTotal_byPairing[pairing]->fill(bestRescaledAngle);
           if(allJetsMatched){
             inside1_allMatched->fill(bestRescaledAngle);
             insideTotal_allMatched->fill(bestRescaledAngle);
+            inside1_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
+            insideTotal_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
           }
         }
         //RegionB
         if (jetNum==1){
           outside1->fill(bestRescaledAngle);
           outsideTotal->fill(bestRescaledAngle);
+          outside1_byPairing[pairing]->fill(bestRescaledAngle);
+          outsideTotal_byPairing[pairing]->fill(bestRescaledAngle);
           if(allJetsMatched){
             outside1_allMatched->fill(bestRescaledAngle);
             outsideTotal_allMatched->fill(bestRescaledAngle);
+            outside1_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
+            outsideTotal_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
           }
         }
         //RegionC
         if (jetNum==2){
           inside2->fill(bestRescaledAngle);
           insideTotal->fill(bestRescaledAngle);
+          inside2_byPairing[pairing]->fill(bestRescaledAngle);
+          insideTotal_byPairing[pairing]->fill(bestRescaledAngle);
           if(allJetsMatched){
             inside2_allMatched->fill(bestRescaledAngle);
             insideTotal_allMatched->fill(bestRescaledAngle);
+            inside2_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
+            insideTotal_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
           }
         }
         //RegionD
         if (jetNum==3){
           outside2->fill(bestRescaledAngle);
           outsideTotal->fill(bestRescaledAngle);
+          outside2_byPairing[pairing]->fill(bestRescaledAngle);
+          outsideTotal_byPairing[pairing]->fill(bestRescaledAngle);
           if(allJetsMatched){
             outside2_allMatched->fill(bestRescaledAngle);
             outsideTotal_allMatched->fill(bestRescaledAngle);
+            outside2_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
+            outsideTotal_allMatched_byPairing[pairing]->fill(bestRescaledAngle);
           }
         }
       }
@@ -797,6 +880,16 @@ namespace Rivet {
       divide(*insideTotal_allMatched, *outsideTotal_allMatched, region_ratio_allMatched);
       divide(*inside1_allMatched, *inside2_allMatched, inside_ratio_allMatched);
       divide(*outside1_allMatched, *outside2_allMatched, outside_ratio_allMatched);
+
+      for(unsigned int i=0; i<4; i++){
+        divide(*insideTotal_byPairing[i], *outsideTotal_byPairing[i], region_ratio_byPairing[i]);
+        divide(*inside1_byPairing[i], *inside2_byPairing[i], inside_ratio_byPairing[i]);
+        divide(*outside1_byPairing[i], *outside2_byPairing[i], outside_ratio_byPairing[i]);
+  
+        divide(*insideTotal_allMatched_byPairing[i], *outsideTotal_allMatched_byPairing[i], region_ratio_allMatched_byPairing[i]);
+        divide(*inside1_allMatched_byPairing[i], *inside2_allMatched_byPairing[i], inside_ratio_allMatched_byPairing[i]);
+        divide(*outside1_allMatched_byPairing[i], *outside2_allMatched_byPairing[i], outside_ratio_allMatched_byPairing[i]);
+      }
     
     }
 
@@ -832,72 +925,97 @@ namespace Rivet {
     //particle multiplicity after cuts
     Histo1DPtr _h_mult_after;
 
+    //Diagnostic plots
+    Histo1DPtr _h_mult_nocut;
+
     //Figure 6, particle flow per event in each region
     Histo1DPtr phi_rescaled;
 
     //Figure 5, ratio between particle count inside/outside
     Histo1DPtr insideTotal;
     Histo1DPtr outsideTotal;
+
     //Figure 5, but requiring match between each jet and a truth quark
     Histo1DPtr insideTotal_allMatched;
     Histo1DPtr outsideTotal_allMatched;
 
-    Scatter2DPtr region_ratio;
-    Scatter2DPtr inside_ratio;
-    Scatter2DPtr outside_ratio;
-
-    Scatter2DPtr region_ratio_allMatched;
-    Scatter2DPtr inside_ratio_allMatched;
-    Scatter2DPtr outside_ratio_allMatched;
-
-    //Diagnostic plots
-    Histo1DPtr _h_mult_nocut;
 
     Histo1DPtr inside1;
-    Histo1DPtr inside2;
-    Histo1DPtr outside1;
-    Histo1DPtr outside2;
-
     Histo1DPtr inside1_allMatched;
+
+    Histo1DPtr inside2;
     Histo1DPtr inside2_allMatched;
+
+    Histo1DPtr outside1;
     Histo1DPtr outside1_allMatched;
+
+    Histo1DPtr outside2;
     Histo1DPtr outside2_allMatched;
 
-    Histo1DPtr regionA;
-    Histo1DPtr regionB;
-    Histo1DPtr regionC;
-    Histo1DPtr regionD;
-    std::vector<Histo1DPtr> regions;
+    Scatter2DPtr region_ratio;
+    Scatter2DPtr region_ratio_allMatched;
 
-    Histo1DPtr quark1;
-    Histo1DPtr quark2;
-    Histo1DPtr quark3;
-    Histo1DPtr quark4;
+    Scatter2DPtr inside_ratio;
+    Scatter2DPtr inside_ratio_allMatched;
+
+    Scatter2DPtr outside_ratio;
+    Scatter2DPtr outside_ratio_allMatched;
+
+
+    //Figure 5, ratio between particle count inside/outside
+    std::vector<Histo1DPtr> insideTotal_byPairing;
+    std::vector<Histo1DPtr> outsideTotal_byPairing;
+
+    //Figure 5, but requiring match between each jet and a truth quark
+    std::vector<Histo1DPtr> insideTotal_allMatched_byPairing;
+    std::vector<Histo1DPtr> outsideTotal_allMatched_byPairing;
+        
+        
+    std::vector<Histo1DPtr> inside1_byPairing;
+    std::vector<Histo1DPtr> inside1_allMatched_byPairing;
+
+    std::vector<Histo1DPtr> inside2_byPairing;
+    std::vector<Histo1DPtr> inside2_allMatched_byPairing;
+
+    std::vector<Histo1DPtr> outside1_byPairing;
+    std::vector<Histo1DPtr> outside1_allMatched_byPairing;
+
+    std::vector<Histo1DPtr> outside2_byPairing;
+    std::vector<Histo1DPtr> outside2_allMatched_byPairing;
+        
+    std::vector<Scatter2DPtr> region_ratio_byPairing;
+    std::vector<Scatter2DPtr> region_ratio_allMatched_byPairing;
+        
+    std::vector<Scatter2DPtr> inside_ratio_byPairing;
+    std::vector<Scatter2DPtr> inside_ratio_allMatched_byPairing;
+          
+    std::vector<Scatter2DPtr> outside_ratio_byPairing;
+    std::vector<Scatter2DPtr> outside_ratio_allMatched_byPairing;
+            
+
+    std::vector<std::vector<Histo1DPtr> > regions_byPairing;
+    std::vector<std::vector<Histo1DPtr> > jetPts_byPairing;
+    std::vector<std::vector<Histo1DPtr> > jetThetas_byPairing;
+
+
+
+    std::vector<Histo1DPtr> regions;
+    std::vector<Histo1DPtr> jetPts;
+    std::vector<Histo1DPtr> jetThetas;
+
     std::vector<Particle> truth_quarks;
+    std::vector<Histo1DPtr> quarkdR;
+    std::vector<Histo1DPtr> regionsQ;
 
     Histo1DPtr mismatchDeltaR;
 
     Histo1DPtr check_index;
 
-    Histo1DPtr jetToQuark1;
-    Histo1DPtr jetToQuark2;
-    Histo1DPtr jetToQuark3;
-    Histo1DPtr jetToQuark4;
-
-    Histo1DPtr quarkdR1;
-    Histo1DPtr quarkdR2;
-    Histo1DPtr quarkdR3;
-    Histo1DPtr quarkdR4;
-    std::vector<Histo1DPtr> quarkdR;
-
-    Histo1DPtr regionQA;
-    Histo1DPtr regionQB;
-    Histo1DPtr regionQC;
-    Histo1DPtr regionQD;
-    std::vector<Histo1DPtr> regionsQ;
 
     Histo1DPtr orderingChoice;
     Histo1DPtr orderingChoice_allMatched;
+
+    // Are the jets correctly matched to quarks
     Histo1DPtr isMatched;
 
     Histo1DPtr sorted;
