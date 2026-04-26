@@ -72,12 +72,10 @@ namespace Rivet {
       // Book histograms
 
       // One histogram for each of the two jet pairs
-      Histo1DPtr tmpDijetMass1;
-      Histo1DPtr tmpDijetMass2;
-      std::string nameDijetMass1 = "dijet_mass_1";
-      std::string nameDijetMass2 = "dijet_mass_2";
-      book(_h_dijetMass1, nameDijetMass1,  40, 0, 120);
-      book(_h_dijetMass2, nameDijetMass2,  40, 0, 120);
+      book(_h_dijetMass1, "dijet_mass_1",  40, 0, 120);
+      book(_h_dijetMass2, "dijet_mass_2",  40, 0, 120);
+      book(_h_dijetMass1_allMatched, "dijet_mass_1_allMatched",  40, 0, 120);
+      book(_h_dijetMass2_allMatched, "dijet_mass_2_allMatched",  40, 0, 120);
 
       book(quarkMassWm, "Wm_Quark_Mass",  40, 0, 120);
       book(quarkMassWp, "Wp_Quark_Mass",  40, 0, 120);
@@ -132,6 +130,7 @@ namespace Rivet {
 
       book(orderingChoice, "orderingChoice", 4, -0.5, 3.5);
       book(orderingChoice_allMatched, "orderingChoice_allMatched", 4, -0.5, 3.5);
+      book(isMatched, "isMatched", 2, -0.5, 1.5);
 
       //Angle between each region
       book(regionA, "Region_A", 72, -0.5, 180.5);
@@ -150,10 +149,10 @@ namespace Rivet {
 
       book(check_index, "check_index", 6, -1, 5);
 
-      book(jetToQuark1, "pT_Ratio_1", 50, 0, 7);
-      book(jetToQuark2, "pT_Ratio_2", 50, 0, 7);
-      book(jetToQuark3, "pT_Ratio_3", 50, 0, 7);
-      book(jetToQuark4, "pT_Ratio_4", 50, 0, 7);
+      book(jetToQuark1, "pT_Ratio_1", 100, 0, 3);
+      book(jetToQuark2, "pT_Ratio_2", 100, 0, 3);
+      book(jetToQuark3, "pT_Ratio_3", 100, 0, 3);
+      book(jetToQuark4, "pT_Ratio_4", 100, 0, 3);
       histosRatio = {jetToQuark1, jetToQuark2, jetToQuark3, jetToQuark4};
 
       book(quarkdR1, "quark_region_dR1", 50, 0, 1.5);
@@ -173,6 +172,23 @@ namespace Rivet {
 
       out = new std::ofstream("outEventDisplay.csv");
 
+    }
+
+    bool tryMatch(int u,
+              const std::vector<std::vector<int>>& adj,
+              std::vector<int>& matchTo,
+              std::vector<bool>& visited) {
+      for (int v : adj[u]) {
+        if (visited[v]) continue;
+        visited[v] = true;
+
+        // If v is free OR we can re-match its partner
+        if (matchTo[v] == -1 || tryMatch(matchTo[v], adj, matchTo, visited)) {
+          matchTo[v] = u;
+          return true;
+        }
+      }
+      return false;
     }
 
     void writeEvent(fastjet::PseudoJet correctJetPair1, fastjet::PseudoJet correctJetPair2, FourMomentum fv_Wp, FourMomentum fv_Wm, FourMomentum fv_q1, FourMomentum fv_q2, FourMomentum fv_q3, FourMomentum fv_q4,
@@ -323,12 +339,10 @@ namespace Rivet {
             WmQuarks.push_back(Particle(q));
       }
       if (WpQuarks.size() != 2 || WmQuarks.size() != 2){
-        std::cout << "Did not find enough quarks" << std::endl;
-        std::cout << WpQuarks.size() << "\t" << WmQuarks.size() << std::endl;
+        //std::cout << "Did not find enough quarks" << std::endl;
+        //std::cout << WpQuarks.size() << "\t" << WmQuarks.size() << std::endl;
         return;
       }
-
-
 
       //Add event that survived 4-jet selection
       _h_cutflow->fill(2);
@@ -384,24 +398,8 @@ namespace Rivet {
       //Cut if jets are not distinct pairs
       _h_cutflow->fill(4);
 
-      //Note: First two are from the same W, next 2 are the other W
-      fastjet::PseudoJet correctJetPair1 = selectedJets[index1] + selectedJets[index2];
-      fastjet::PseudoJet correctJetPair2 = selectedJets[index3] + selectedJets[index4];
-      _h_dijetMass1->fill(correctJetPair1.m());
-      _h_dijetMass2->fill(correctJetPair2.m());
-      _h_mult_after->fill(particles.size());
 
-      //if(correctJetPair1.m() < 70 || correctJetPair1.m() >90 || correctJetPair2.m() < 70 || correctJetPair2.m() >90) vetoEvent;
       
-      // We have passed the full cutflow now
-
-      // We have already ordered them, so we don't need to do this again
-      std::vector<int> ordered_indices = {index1,index2,index3,index4};
-      
-      for(unsigned int i=0; i<ordered_indices.size(); i++){
-        check_index->fill(ordered_indices[i]);
-      }
-
       //Parton Comparison Graph/ Truth particle analysis from Iza
       //Iza's ordering scheme
       //  Order Wp quarks by pT
@@ -437,13 +435,13 @@ namespace Rivet {
       FourMomentum fv_Wp(Wp->momentum().e(), Wp->momentum().px(), Wp->momentum().py(), Wp->momentum().pz());
       FourMomentum fv_Wm(Wm->momentum().e(), Wm->momentum().px(), Wm->momentum().py(), Wm->momentum().pz());
 
-      std::vector<FourMomentum> momentaList = {fv_q1, fv_q2, fv_q3, fv_q4, fv_q1};
+      std::vector<FourMomentum> momentaList = {fv_q1, fv_q2, fv_q3, fv_q4};
       double angleWpDeg = getAngleInDegrees(fv_q1.angle(fv_q2));
       double angleWmDeg = getAngleInDegrees(fv_q3.angle(fv_q4));
 
       if (angleWpDeg > 100.0 && angleWpDeg < 140.0 && angleWmDeg > 100.0 && angleWmDeg < 140.0) {
         for (int i = 0; i < 4; ++i) {
-          double deg_theta = momentaList[i].angle(momentaList[(i+1)%(truth_quarks.size())]) * 180/3.14;
+          double deg_theta = getAngleInDegrees(momentaList[i].angle(momentaList[(i+1)%(truth_quarks.size())]));
           regionsQ[i]->fill(deg_theta);
         }
       }
@@ -480,23 +478,33 @@ namespace Rivet {
         quarkdR[i]->fill(deltaR(truth_quarks[i],truth_quarks[(i+1)%truth_quarks.size()]));
       }
 
-
-
-      // Want to check that all jets are matched to a truth quark
-      // This could be improved by requiring unique matches,
-      // but I think it is probably fine for most cases
       bool allJetsMatched = true;
-      //Now we need 4 histograms, one for each quark, comparing its deltaR to the jets
-      for(int j = 0; j < selectedJets.size(); j++){
-        bool isMatched = false;
-        for(int i = 0; i <truth_quarks.size(); ++i){
-          double deltaR1 = deltaR(truth_quarks[i].momentum(),jet4mom[j]);
-          if(deltaR1 < 0.05) isMatched = true;
+
+      // This comes from chatGPT, so I'm not 100% sure it's all correct
+      std::vector<std::vector<int>> adj(4);
+
+      double maxDeltaR = 0.1;
+      // Build all pairwise distances
+      for (size_t j = 0; j < selectedJets.size(); j++) {
+        for (size_t i = 0; i < truth_quarks.size(); i++) {
+          double dR = deltaR(truth_quarks[i].momentum(), jet4mom[j]); 
+          if (dR < maxDeltaR && std::abs(truth_quarks[i].pT()/jet4mom[j].pT()-1)<0.2) {
+            adj[i].push_back(j);
+          }
         }
-        if(!isMatched) allJetsMatched = false;
       }
 
-     
+      int N = 4;
+      std::vector<int> matchTo(N, -1); // which v1 index each v2 node is matched to
+
+      int matchCount = 0;
+      for (int u = 0; u < N; ++u) {
+        std::vector<bool> visited(N, false);
+        if (tryMatch(u, adj, matchTo, visited)) {
+          matchCount++;
+        }
+      }
+
 
       // Two options for non-adjacent jet pairings, once we have selected the jets that make regions B and D
       // j1_1 j2_1, j1_2 j2_2
@@ -520,6 +528,7 @@ namespace Rivet {
       // Jets 2-3 form region B (smallest angle, which must be from minJetPair_1 by definition)
       // Jets 3-4 form region C (second-largest angle)
       // Jets 4-1 form region D (second-smallest angle, which must be from minJetPair_2 by definition)
+      std::cout << "\t\t\t\t\t\t " << angle2_1 << "\t" << angle2_2 <<"\t" << angle1_1 << "\t" << angle1_2 << "\t" << minJetAngle1  << "\t" << minJetAngle2 << std::endl;
       if(sumAngles1 > sumAngles2){
         if(angle1_2 > angle1_1){
           index2 = minJetPair_1_jet2index;
@@ -527,9 +536,9 @@ namespace Rivet {
           index4 = minJetPair_2_jet1index;
           index1 = minJetPair_2_jet2index;
           orderingChoice->fill(0);
-          if(allJetsMatched){
-            orderingChoice_allMatched->fill(0);
-          }
+          //if(allJetsMatched){
+          //  orderingChoice_allMatched->fill(0);
+          //}
         }
         else{
           index2 = minJetPair_1_jet1index;
@@ -537,9 +546,9 @@ namespace Rivet {
           index4 = minJetPair_2_jet2index;
           index1 = minJetPair_2_jet1index;
           orderingChoice->fill(1);
-          if(allJetsMatched){
-            orderingChoice_allMatched->fill(1);
-          }
+          //if(allJetsMatched){
+          //  orderingChoice_allMatched->fill(1);
+          //}
         }
       }
       else{
@@ -553,22 +562,81 @@ namespace Rivet {
           index4 = minJetPair_2_jet2index;
           index1 = minJetPair_2_jet1index;
           orderingChoice->fill(2);
-          if(allJetsMatched){
-            orderingChoice_allMatched->fill(2);
-          }
+          //if(allJetsMatched){
+          //  orderingChoice_allMatched->fill(2);
+          //}
         }
         else{
+          std::cout << "D" << std::endl;
+          //std::cout << "\t\t\t\t\t\t " << angle2_1 << "\t" << angle2_2 <<"\t" << angle1_1 << "\t" << angle1_2 << "\t" << minJetAngle1  << "\t" << minJetAngle2 << std::endl;
           index2 = minJetPair_1_jet1index;
           index3 = minJetPair_1_jet2index;
           index4 = minJetPair_2_jet1index;
           index1 = minJetPair_2_jet2index;
           orderingChoice->fill(3);
+          //if(allJetsMatched){
+          //  orderingChoice_allMatched->fill(3);
+          //}
+        }
+      }
+      // We have passed the full cutflow now
+
+      // We have already ordered them, so we don't need to do this again
+      std::vector<int> ordered_indices = {index1,index2,index3,index4};
+      
+      for(unsigned int i=0; i<ordered_indices.size(); i++){
+        check_index->fill(ordered_indices[i]);
+      }
+
+
+      //Note: First two are from the same W, next 2 are the other W
+      fastjet::PseudoJet correctJetPair1 = selectedJets[index1] + selectedJets[index2];
+      fastjet::PseudoJet correctJetPair2 = selectedJets[index3] + selectedJets[index4];
+      if(matchCount !=4) allJetsMatched = false;
+      // Check if the inside regions correspond to a W, or to mismatched W's
+      // We only want the correct matching
+      if(allJetsMatched){
+          if((matchTo[ordered_indices[0]]==0 && matchTo[ordered_indices[1]] !=1 )|| (matchTo[ordered_indices[0]]==2 && matchTo[ordered_indices[1]] !=3 )) allJetsMatched = false;
+          if((matchTo[ordered_indices[1]]==0 && matchTo[ordered_indices[0]] !=1 )|| (matchTo[ordered_indices[1]]==2 && matchTo[ordered_indices[0]] !=3 )) allJetsMatched = false;
+      }
+
+      if(sumAngles1 > sumAngles2){
+        if(angle1_2 > angle1_1){
+          if(allJetsMatched){
+            orderingChoice_allMatched->fill(0);
+          }
+        }
+        else{
+          if(allJetsMatched){
+            orderingChoice_allMatched->fill(1);
+          }
+        }
+      }
+      else{
+        if(angle2_2 > angle2_1){
+          if(allJetsMatched){
+            orderingChoice_allMatched->fill(2);
+          }
+        }
+        else{
           if(allJetsMatched){
             orderingChoice_allMatched->fill(3);
           }
         }
       }
 
+
+
+      _h_dijetMass1->fill(correctJetPair1.m());
+      _h_dijetMass2->fill(correctJetPair2.m());
+      if(allJetsMatched){
+        _h_dijetMass1_allMatched->fill(correctJetPair1.m());
+        _h_dijetMass2_allMatched->fill(correctJetPair2.m());
+      }
+      _h_mult_after->fill(particles.size());
+
+
+      isMatched->fill(allJetsMatched);
 
       // Pre-calculating stuff so we don't have to keep doing this every time
       std::vector<Vector3> a_vec;
@@ -695,11 +763,15 @@ namespace Rivet {
     {
       normalize(_h_dijetMass1);
       normalize(_h_dijetMass2);
+      normalize(_h_dijetMass1_allMatched);
+      normalize(_h_dijetMass2_allMatched);
       normalize(_h_ycutAll);
       normalize(_h_selectedJets);
       normalize(_h_mult_before);
       normalize(_h_mult_after);
+      normalize(isMatched);
       normalize(orderingChoice);
+      normalize(orderingChoice_allMatched);
       scale(phi_rescaled, 1.0 / sumOfWeights());
 
       scale(inside1, 1.0 / sumOfWeights());
@@ -742,6 +814,9 @@ namespace Rivet {
 
     Histo1DPtr _h_dijetMass1;
     Histo1DPtr _h_dijetMass2;
+
+    Histo1DPtr _h_dijetMass1_allMatched;
+    Histo1DPtr _h_dijetMass2_allMatched;
 
     Histo1DPtr quarkMassWm;
     Histo1DPtr quarkMassWp;
@@ -822,6 +897,8 @@ namespace Rivet {
     std::vector<Histo1DPtr> regionsQ;
 
     Histo1DPtr orderingChoice;
+    Histo1DPtr orderingChoice_allMatched;
+    Histo1DPtr isMatched;
 
     Histo1DPtr sorted;
     std::vector<Histo1DPtr> histos;
