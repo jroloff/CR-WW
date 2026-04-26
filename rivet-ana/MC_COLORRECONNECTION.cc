@@ -46,6 +46,11 @@ namespace Rivet {
       return -1;
     }
 
+
+    double getAngleInDegrees(double radians){
+      return radians*180/3.14159;
+    }
+
     //////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// @name Analysis methods
@@ -62,12 +67,6 @@ namespace Rivet {
 
       ChargedFinalState tracks(Cuts::pT > 0.2*GeV && Cuts::abseta < m_maxEtaTracks);
       declare(tracks, "tracks");
-
-      // TODO: I'm not sure why the Durham algorithm seems to be failing, but we should figure that out...
-      //FastJets jetDurham(fs, FastJets::Algo::DURHAM, m_jetRadius, JetAlg::Muons::NONE, JetAlg::Invisibles::NONE);
-      FastJets jetDurham(fs, FastJets::Algo::ANTIKT, m_jetRadius, JetAlg::Muons::NONE, JetAlg::Invisibles::NONE);
-      declare(jetDurham, "DurhamJets");
-
 
       ////////////////////////////////////////////////////////////////////////////////////////////////
       // Book histograms
@@ -103,32 +102,49 @@ namespace Rivet {
       book(phi_rescaled, "ParticleFlow_PhiRescaled", 84, -0.2, 4.2);
 
       //Figure 6
-      book(insideTotal, "Inside_W_Region", 36, -0.2, 1.2);
-      book(OutsideTotal, "Outside_W_Region", 36, -0.2, 1.2);
-      book(region_ratio, "Region_Ratio", 36, -0.2, 1.2);
+      book(insideTotal, "Inside_W_Region", 20, 0, 1.);
+      book(outsideTotal, "Outside_W_Region", 20, 0, 1.);
+      book(region_ratio, "Region_Ratio");
+
+      book(insideTotal_allMatched, "Inside_W_Region_allMatched", 20, 0, 1.);
+      book(outsideTotal_allMatched, "Outside_W_Region_allMatched", 20, 0, 1.);
+      book(region_ratio_allMatched, "Region_Ratio_allMatched");
 
       //Diagnostic Plots
-      book(_h_mult_nocut, "Multiplicity_before_cuts", 150, -0.5, 150.5);
+      book(_h_mult_nocut, "Multiplicity_before_cuts", 151, -0.5, 150.5);
 
       //ThetaRescaled for each region
-      book(inside1, "inside1", 24, -0.2, 1.2);
-      book(inside2, "inside2", 24, -0.2, 1.2);
-      book(outside1, "outside1", 24, -0.2, 1.2);
-      book(outside2, "outside2", 24, -0.2, 1.2);
+      book(inside1, "inside1", 24, 0.0, 1.0);
+      book(inside2, "inside2", 24, 0.0, 1.0);
+      book(outside1, "outside1", 24, 0.0, 1.0);
+      book(outside2, "outside2", 24, 0.0, 1.0);
 
-      book(outside_ratio, "Outside_Ratio", 24, -0.2, 1.2);
-      book(inside_ratio, "Inside_Ratio", 24, -0.2, 1.2);
+      book(inside1_allMatched, "inside1_allMatched", 24, 0.0, 1.0);
+      book(inside2_allMatched, "inside2_allMatched", 24, 0.0, 1.0);
+      book(outside1_allMatched, "outside1_allMatched", 24, 0.0, 1.0);
+      book(outside2_allMatched, "outside2_allMatched", 24, 0.0, 1.0);
+
+      book(outside_ratio, "Outside_Ratio");
+      book(inside_ratio, "Inside_Ratio");
+
+      book(outside_ratio_allMatched, "Outside_Ratio_allMatched");
+      book(inside_ratio_allMatched, "Inside_Ratio_allMatched");
+
+      book(orderingChoice, "orderingChoice", 4, -0.5, 3.5);
+      book(orderingChoice_allMatched, "orderingChoice_allMatched", 4, -0.5, 3.5);
 
       //Angle between each region
       book(regionA, "Region_A", 72, -0.5, 180.5);
       book(regionB, "Region_B", 72, -0.5, 180.5);
       book(regionC, "Region_C", 72, -0.5, 180.5);
       book(regionD, "Region_D", 72, -0.5, 180.5);
+      regions = {regionA, regionB, regionC, regionD};
 
       book(quark1, "Quark1_deltaR", 50, 0, 1.5);
       book(quark2, "Quark2_deltaR", 50, 0, 1.5);
       book(quark3, "Quark3_deltaR", 50, 0, 1.5);
       book(quark4, "Quark4_deltaR", 50, 0, 1.5);
+      histos = {quark1,quark2,quark3,quark4};
 
       book(mismatchDeltaR, "Matching_DeltaR", 50, 0, 3);
 
@@ -138,385 +154,29 @@ namespace Rivet {
       book(jetToQuark2, "pT_Ratio_2", 50, 0, 7);
       book(jetToQuark3, "pT_Ratio_3", 50, 0, 7);
       book(jetToQuark4, "pT_Ratio_4", 50, 0, 7);
+      histosRatio = {jetToQuark1, jetToQuark2, jetToQuark3, jetToQuark4};
 
       book(quarkdR1, "quark_region_dR1", 50, 0, 1.5);
       book(quarkdR2, "quark_region_dR2", 50, 0, 1.5);
       book(quarkdR3, "quark_region_dR3", 50, 0, 1.5);
       book(quarkdR4, "quark_region_dR4", 50, 0, 1.5);
+      quarkdR = {quarkdR1, quarkdR2, quarkdR3, quarkdR4};
 
       //Using truth quarks
       book(regionQA, "Quark_Region_A", 72, -0.5, 180.5);
       book(regionQB, "Quark_Region_B", 72, -0.5, 180.5);
       book(regionQC, "Quark_Region_C", 72, -0.5, 180.5);
       book(regionQD, "Quark_Region_D", 72, -0.5, 180.5);
+      regionsQ = {regionQA, regionQB, regionQC, regionQD};
 
       book(sorted, "Sorted_particles", 13, -0.5, 12.5);
-      
 
       out = new std::ofstream("outEventDisplay.csv");
+
     }
 
-
-    /// Perform the per-event analysis
-    void analyze(const Event& event) {
-      // Most inspiration taken from https://arxiv.org/pdf/0704.0597
-
-      // Things we don't need right now, but might want later
-      //double collisionE = sqrtS();
-      //const Particles& tracks = apply<ChargedFinalState>(event, "tracks").particlesByPt();
-      const Particles& particles = apply<FinalState>(event, "particles").particles();
-
-      //All events
-      //Use event.weight() maybe to normalize
-      _h_cutflow->fill(1);
-
-      _h_mult_nocut->fill(particles.size());
-
-      // Fastjet analysis - select algorithm and parameters
-      fastjet::Strategy               strategy = fastjet::Best;
-      fastjet::RecombinationScheme    recombScheme = fastjet::E_scheme;
-      fastjet::JetDefinition*         jetDef = new fastjet::JetDefinition(fastjet::ee_kt_algorithm,
-                                      recombScheme, strategy);
-
-      // Run Fastjet algorithm
-      fastjet::ClusterSequence clustSeq(particles, *jetDef);
-      int nJetMin = 4;
-      //clustSeq.exclusive_dmerge_max(nJetMin-1);
-
-      const std::vector<fastjet::PseudoJet> durjet = clustSeq.exclusive_jets(nJetMin);
-
-      _h_mult_before->fill(particles.size());
-
-      std::vector<fastjet::PseudoJet> selectedJets;
-
-      //ycut calculation
-      for(unsigned int i=0; i<durjet.size(); i++){
-        PseudoJet jj, j1, j2;
-        jj = durjet[i];
-        if(jj.has_parents(j1, j2)){
-          FourMomentum fv1 = FourVector(j1.E(), j1.px() , j1.py(), j1.pz());
-          FourMomentum fv2 = FourVector(j2.E(), j2.px() , j2.py(), j2.pz());
-          double ycut = 2 * j2.E()*j2.E() * (1- std::cos(fv1.angle(fv2))) / (jj.E()*jj.E());
-
-          //Add ycut pre-veto
-          _h_ycutAll->fill(ycut);
-
-          if(ycut < 0.005) {
-            selectedJets.push_back(jj);
-          }
-        }
-      }
-
-      //Histo of selected jets
-      _h_selectedJets->fill(durjet.size());
-
-      // Need exactly 4 jets
-      if (selectedJets.size() != 4) vetoEvent;
-
-      //Add event that survived 4-jet selection
-      _h_cutflow->fill(2);
-
-      // Two smallest angles < 100 degrees
-      int minJetPair_1_jet1index = -1;
-      int minJetPair_1_jet2index = -1;
-
-      int minJetPair_2_jet1index = -1;
-      int minJetPair_2_jet2index = -1;
-
-      double minJetAngle1 = 1000;
-      double minJetAngle2 = 1000;
-
-      for(unsigned int i=0; i<selectedJets.size(); i++){
-        for(unsigned int j=i; j<selectedJets.size(); j++){
-          if(i==j) continue;
-          FourMomentum fv1 = FourVector(selectedJets[i].E(), selectedJets[i].px() , selectedJets[i].py(), selectedJets[i].pz());
-          FourMomentum fv2 = FourVector(selectedJets[j].E(), selectedJets[j].px() , selectedJets[j].py(), selectedJets[j].pz());
-          double angleInDegrees = fv1.angle(fv2) * 180 / 3.14;
-
-          if(angleInDegrees < minJetAngle1){
-            minJetPair_2_jet1index = minJetPair_1_jet1index;
-            minJetPair_2_jet2index = minJetPair_1_jet2index;
-            minJetAngle2 = minJetAngle1;
-
-            minJetPair_1_jet1index = i;
-            minJetPair_1_jet2index = j;
-            minJetAngle1 = angleInDegrees;
-          }
-          else if(angleInDegrees < minJetAngle2){
-            minJetPair_2_jet1index = i;
-            minJetPair_2_jet2index = j;
-            minJetAngle2 = angleInDegrees;
-          }
-
-        }
-      }
-
-      // Find two other angles that are between 100 and 140 degrees, and aren't adjacent
-      //These become the jet pairs from the W
-      std::vector<double> jetAngles;
-      //std::vector<double> jetMasses;
-      std::vector<int> jetIndices1;
-      std::vector<int> jetIndices2;
-
-      for(unsigned int i=0; i<selectedJets.size(); i++){
-        for(unsigned int j=i+1; j<selectedJets.size(); j++){
-          //The selected jet pairs aren't the smallest pairs
-          if( (i == minJetPair_1_jet1index && j == minJetPair_1_jet2index) ||
-              (j == minJetPair_1_jet1index && i == minJetPair_1_jet2index) ||
-              (i == minJetPair_2_jet1index && j == minJetPair_2_jet2index) ||
-              (j == minJetPair_2_jet1index && i == minJetPair_2_jet2index) ) continue;
-
-          FourMomentum fv1 = FourVector(selectedJets[i].E(), selectedJets[i].px() , selectedJets[i].py(), selectedJets[i].pz());
-          FourMomentum fv2 = FourVector(selectedJets[j].E(), selectedJets[j].px() , selectedJets[j].py(), selectedJets[j].pz());
-          double angleInDegrees = fv1.angle(fv2) * 180 / 3.14;
-          //fastjet::PseudoJet jetPair1 = selectedJets[i] + selectedJets[j];
-
-          //Collect the 4 remaining jet combinations and their angles
-          jetIndices1.push_back(i);
-          jetIndices2.push_back(j);
-          jetAngles.push_back(angleInDegrees);
-        }
-      }
-
-      //Apply cut that the smallest angles must be less than 100 degrees
-      if(minJetAngle1 > 100) vetoEvent;
-      if(minJetAngle2 > 100) vetoEvent;
-
-      //Cut if the pairs of jets are too wide
-      _h_cutflow->fill(3);
-
-      // These two angles don't share a jet
-      // Not sure if we should veto the event, or just find another pairing
-      if( minJetPair_1_jet1index ==  minJetPair_2_jet1index || minJetPair_1_jet1index ==  minJetPair_2_jet2index ||
-          minJetPair_1_jet2index ==  minJetPair_2_jet1index || minJetPair_1_jet2index ==  minJetPair_2_jet2index){
-         vetoEvent;
-      }
-
-      //Cut if jets are not distinct pairs
-      _h_cutflow->fill(4);
-
-      bool isPass = false;
-      int index1 = -1;
-      int index2 = -1;
-      int index3 = -1;
-      int index4 = -1;
-
-      //Angles between W jets should be between 100 and 140 degrees
-      for(unsigned int i=0; i<jetAngles.size(); i++){
-        if(jetAngles[i] < 100 || jetAngles[i] > 140) continue;
-        for(unsigned int j=i+1; j<jetAngles.size(); j++){
-          if(jetAngles[j] < 100 || jetAngles[j] > 140) continue;
-
-          //Loop through all pairings until we find a non adjacent one
-          if( jetIndices1[i] ==  jetIndices1[j] || jetIndices2[i] ==  jetIndices2[j] ||
-              jetIndices1[i] ==  jetIndices2[j] || jetIndices2[i] ==  jetIndices1[j]) continue;
-
-          isPass = true;
-          //Indexes 1 and 2 should be the first pair, indexes 3 and 4 should be the second
-          index1 = jetIndices1[i];
-          index2 = jetIndices2[i];
-          index3 = jetIndices1[j];
-          index4 = jetIndices2[j];
-        }
-      }
-
-      if(!isPass) vetoEvent;
-
-      //cut if the jets don't fit expected geometry
-      _h_cutflow->fill(5);
-
-      //We're gonna try to ensure the jets are listed in clockwise order
-      //The paper says that the interjet regions have the smallest angles, which we found.
-      
-      std::array<int,4> indices = {index1,index2,index3,index4};
-      std::vector<int> ordered_indices;
-
-      //Start by putting the first of the smallest angle region
-      ordered_indices.push_back(minJetPair_1_jet1index);
-
-      //loop until we find which index matches it, then add its pair
-      for(unsigned int i=0; i<indices.size();i++){
-        if(minJetPair_1_jet1index == indices[i]){
-          if(i%2 == 0){
-            ordered_indices.push_back(indices[i+1]);
-            break;
-          }
-          else{
-            ordered_indices.push_back(indices[i-1]);
-            break;
-          }
-        }
-      }
-
-      //Add the next jet based on the smallest jet pairs
-      if(ordered_indices[1] == minJetPair_2_jet1index)
-        ordered_indices.push_back(minJetPair_2_jet2index);
-      else
-        ordered_indices.push_back(minJetPair_2_jet1index);
-      
-      //Add the last remaining jet, and the first jet again for looping
-      ordered_indices.push_back(minJetPair_1_jet2index);
-      ordered_indices.push_back(minJetPair_1_jet1index);
-      
-      //Ok now ordered_indices should contain all jets in order clockwise
-      //Note: First two are from the same W, next 2 are the other W
-
-      fastjet::PseudoJet correctJetPair1 = selectedJets[ordered_indices[0]] + selectedJets[ordered_indices[1]];
-      fastjet::PseudoJet correctJetPair2 = selectedJets[ordered_indices[2]] + selectedJets[ordered_indices[3]];
-
-      _h_dijetMass1->fill(correctJetPair1.m());
-      _h_dijetMass2->fill(correctJetPair2.m());
-      _h_mult_after->fill(particles.size());
-
-      //For checking proper ordering
-      check_index->fill(ordered_indices[0]);
-      check_index->fill(ordered_indices[1]);
-      check_index->fill(ordered_indices[2]);
-      check_index->fill(ordered_indices[3]);
-
-
-      //Parton Comparison Graph/ Truth particle analysis from Iza
-
-      const HepMC3::GenEvent &ge = *event.genEvent();
-      //  Find hard-scatter W bosons
-      HepMC3::ConstGenParticlePtr Wp = nullptr;
-      HepMC3::ConstGenParticlePtr Wm = nullptr;
-
-      for (const auto &p : ge.particles()) {
-        if (abs(p->pid()) != 24)
-          continue;
-        if (!p->production_vertex())
-          continue;
-        bool prod_ee = true;
-        for (const auto &parent : p->production_vertex()->particles_in()) {
-          if (abs(parent->pid()) != 11) {
-            prod_ee = false;
-            break;
-          }
-        }
-        if (!prod_ee)
-          continue;
-
-        if (p->pid() == 24)
-          Wp = p;
-        if (p->pid() == -24)
-          Wm = p;
-      }
-      if (!Wp || !Wm)
-        return;
-
-      //  Get quarks from W decays
-      std::vector<Particle> WpQuarks, WmQuarks;
-
-      if (Wp->end_vertex()) {
-        for (const auto &q : Wp->end_vertex()->particles_out())
-          if (PID::isQuark(q->pid()))
-            WpQuarks.push_back(Particle(q));
-      }
-      if (Wm->end_vertex()) {
-        for (const auto &q : Wm->end_vertex()->particles_out())
-          if (PID::isQuark(q->pid()))
-            WmQuarks.push_back(Particle(q));
-      }
-      if (WpQuarks.size() != 2 || WmQuarks.size() != 2)
-        return;
-
-      //Iza's ordering scheme
-      //  Order Wp quarks by pT
-      if (WpQuarks[1].pT() > WpQuarks[0].pT())
-        std::swap(WpQuarks[0], WpQuarks[1]);
-
-      Particle q1 = WpQuarks[0];
-      Particle q2 = WpQuarks[1];
-
-      // Pick q3 based on min dR to q1
-      double dR0 = deltaR(q1.momentum(), WmQuarks[0].momentum());
-      double dR1 = deltaR(q1.momentum(), WmQuarks[1].momentum());
-
-      Particle q3 = (dR0 < dR1 ? WmQuarks[0] : WmQuarks[1]);
-      Particle q4 = (dR0 < dR1 ? WmQuarks[1] : WmQuarks[0]);
-
-      //Checking invariant mass of quarks
-
-      double massWp = (q1.momentum() + q2.momentum()).mass();
-      double massWm = (q3.momentum() + q4.momentum()).mass();
-
-      quarkMassWp -> fill(massWp);
-      quarkMassWm -> fill(massWm);
-
-      //Added to match region graphs
-
-      // Setup 4-momentum
-      FourMomentum fv_q1(q1.E(), q1.px(), q1.py(), q1.pz());
-      FourMomentum fv_q2(q2.E(), q2.px(), q2.py(), q2.pz());
-      FourMomentum fv_q3(q3.E(), q3.px(), q3.py(), q3.pz());
-      FourMomentum fv_q4(q4.E(), q4.px(), q4.py(), q4.pz());
-      FourMomentum fv_Wp(Wp->momentum().e(), Wp->momentum().px(), Wp->momentum().py(), Wp->momentum().pz());
-      FourMomentum fv_Wm(Wm->momentum().e(), Wm->momentum().px(), Wm->momentum().py(), Wm->momentum().pz());
-
-      std::vector<FourMomentum> momentaList = {fv_q1, fv_q2, fv_q3, fv_q4, fv_q1};
-      double angleWpDeg = fv_q1.angle(fv_q2) * 180.0 / M_PI;
-      double angleWmDeg = fv_q3.angle(fv_q4) * 180.0 / M_PI;
-
-      if (angleWpDeg > 100.0 && angleWpDeg < 140.0 && angleWmDeg > 100.0 && angleWmDeg < 140.0) {
-        for (int i = 0; i < 4; ++i) {
-          double deg_theta = momentaList[i].angle(momentaList[i+1]) * 180/3.14;
-          if(i==0)
-            regionQA->fill(deg_theta);
-          if(i==1)
-            regionQB->fill(deg_theta);
-          if(i==2)
-            regionQC->fill(deg_theta);
-          if(i==3)
-            regionQD->fill(deg_theta);
-        }
-      }
-
-      //Now we need 4 histograms, one for each quark, comparing its deltaR to the jets
-      
-      std::vector<Histo1DPtr> histos = {quark1,quark2,quark3,quark4};
-      std::vector<Histo1DPtr> histosRatio = {jetToQuark1, jetToQuark2, jetToQuark3, jetToQuark4};
-      std::vector<Particle> truth_quarks = {q1,q2,q3,q4,q1};
-      std::vector<Histo1DPtr> quarkdR = {quarkdR1, quarkdR2, quarkdR3, quarkdR4};
-
-      for(int i = 0; i <4; ++i){
-        double deltaR2 = 1000;
-        double matchedJetindex = -1;
-
-        //Finds smallest deltaR between a truth quark and any jet
-        for(int j = 0; j < 4; ++j){
-          FourMomentum loop = FourVector(selectedJets[indices[j]].E(), selectedJets[indices[j]].px() , selectedJets[indices[j]].py(), selectedJets[indices[j]].pz());
-          double deltaR1 = deltaR(truth_quarks[i].momentum(),loop);
-          if(deltaR1 < deltaR2){
-            deltaR2 = deltaR1;
-
-            //identify matchedJetindex with the jet paired to selectedJets[j]
-            if (j%2 == 0)
-              matchedJetindex = indices[j+1];
-            else
-              matchedJetindex = indices[j-1];
-          }
-        }
-
-        histos[i]->fill(deltaR2);
-
-        //for the first quark, we found the jet cooresponding to minimum delta R
-        //We then graph the deltaR of the other quark and jet
-        if (i==0){
-          FourMomentum matchedJet = FourVector(selectedJets[matchedJetindex].E(), selectedJets[matchedJetindex].px() , selectedJets[matchedJetindex].py(), selectedJets[matchedJetindex].pz());
-          mismatchDeltaR -> fill(deltaR(matchedJet,truth_quarks[1].momentum()));
-        }
-
-        //Checking ratio of quark pT to jet pT
-        for(int j = 0; j < 4; ++j){
-          FourMomentum loop = FourVector(selectedJets[j].E(), selectedJets[j].px() , selectedJets[j].py(), selectedJets[j].pz());
-          histosRatio[i]->fill(truth_quarks[i].pT()/loop.pT());
-        }
-        //Check dR between quarks
-        quarkdR[i]->fill(deltaR(truth_quarks[i],truth_quarks[i+1]));
-      }
-
-      //
+    void writeEvent(fastjet::PseudoJet correctJetPair1, fastjet::PseudoJet correctJetPair2, FourMomentum fv_Wp, FourMomentum fv_Wm, FourMomentum fv_q1, FourMomentum fv_q2, FourMomentum fv_q3, FourMomentum fv_q4,
+                    double massWp, double massWm, std::vector<fastjet::PseudoJet> selectedJets, std::vector<int> ordered_indices){
       (*out) << "Event" << std::endl;
 
       // Wp
@@ -558,103 +218,476 @@ namespace Rivet {
       for(unsigned int i=0; i<selectedJets[ordered_indices[3]].constituents().size(); i++){
         (*out) << selectedJets[ordered_indices[3]].constituents()[i].theta() << " " << selectedJets[ordered_indices[3]].constituents()[i].phi() << " " << selectedJets[ordered_indices[3]].constituents()[i].e() << "\n";
       }
+    }
+
+
+    /// Perform the per-event analysis
+    void analyze(const Event& event) {
+      // Most inspiration taken from https://arxiv.org/pdf/0704.0597
+
+      // Things we don't need right now, but might want later
+      //double collisionE = sqrtS();
+      //const Particles& tracks = apply<ChargedFinalState>(event, "tracks").particlesByPt();
+      const Particles& particles = apply<FinalState>(event, "particles").particles();
+
+      //All events
+      //Use event.weight() maybe to normalize
+      _h_cutflow->fill(1);
+      _h_mult_nocut->fill(particles.size());
+
+      // Fastjet analysis - select algorithm and parameters
+      fastjet::Strategy               strategy = fastjet::Best;
+      fastjet::RecombinationScheme    recombScheme = fastjet::E_scheme;
+      fastjet::JetDefinition*         jetDef = new fastjet::JetDefinition(fastjet::ee_kt_algorithm,
+                                      recombScheme, strategy);
+
+      // Run Fastjet algorithm
+      fastjet::ClusterSequence clustSeq(particles, *jetDef);
+      int nJetMin = 4;
+      //clustSeq.exclusive_dmerge_max(nJetMin-1);
+      const std::vector<fastjet::PseudoJet> durjet = clustSeq.exclusive_jets(nJetMin);
+
+      _h_mult_before->fill(particles.size());
+
+      std::vector<fastjet::PseudoJet> selectedJets;
+      // Just so we don't have to keep doing this conversion over and over
+      std::vector<FourMomentum> jet4mom;
+
+      //ycut calculation
+      for(unsigned int i=0; i<durjet.size(); i++){
+        PseudoJet jj, j1, j2;
+        jj = durjet[i];
+        if(jj.has_parents(j1, j2)){
+          FourMomentum fv1 = FourVector(j1.E(), j1.px() , j1.py(), j1.pz());
+          FourMomentum fv2 = FourVector(j2.E(), j2.px() , j2.py(), j2.pz());
+          double ycut = 2 * j2.E()*j2.E() * (1- std::cos(fv1.angle(fv2))) / (jj.E()*jj.E());
+
+          //Add ycut pre-veto
+          _h_ycutAll->fill(ycut);
+
+          if(ycut < 0.005) {
+            selectedJets.push_back(jj);
+            FourMomentum fv1 = FourVector(selectedJets[i].E(), selectedJets[i].px() , selectedJets[i].py(), selectedJets[i].pz());
+            jet4mom.push_back(fv1);
+          }
+        }
+      }
+
+      //Histo of selected jets
+      _h_selectedJets->fill(durjet.size());
+
+      // Need exactly 4 jets
+      if (selectedJets.size() != 4) vetoEvent;
+
+      const HepMC3::GenEvent &ge = *event.genEvent();
+      //  Find hard-scatter W bosons
+      HepMC3::ConstGenParticlePtr Wp = nullptr;
+      HepMC3::ConstGenParticlePtr Wm = nullptr;
+
+      for (const auto &p : ge.particles()) {
+        if (abs(p->pid()) != 24)
+          continue;
+        if (!p->production_vertex())
+          continue;
+        bool prod_ee = true;
+        for (const auto &parent : p->production_vertex()->particles_in()) {
+          if (abs(parent->pid()) != 11) {
+            prod_ee = false;
+            break;
+          }
+        }
+        if (!prod_ee)
+          continue;
+
+        if (p->pid() == 24)
+          Wp = p;
+        if (p->pid() == -24)
+          Wm = p;
+      }
+      if (!Wp || !Wm){
+        std::cout << "Did not find both Ws" << std::endl;
+        return;
+      }
+
+      //  Get quarks from W decays
+      std::vector<Particle> WpQuarks, WmQuarks;
+
+      if (Wp->end_vertex()) {
+        for (const auto &q : Wp->end_vertex()->particles_out())
+          if (PID::isQuark(q->pid()))
+            WpQuarks.push_back(Particle(q));
+      }
+      if (Wm->end_vertex()) {
+        for (const auto &q : Wm->end_vertex()->particles_out())
+          if (PID::isQuark(q->pid()))
+            WmQuarks.push_back(Particle(q));
+      }
+      if (WpQuarks.size() != 2 || WmQuarks.size() != 2){
+        std::cout << "Did not find enough quarks" << std::endl;
+        std::cout << WpQuarks.size() << "\t" << WmQuarks.size() << std::endl;
+        return;
+      }
+
+
+
+      //Add event that survived 4-jet selection
+      _h_cutflow->fill(2);
+
+      // Two smallest angles < 100 degrees
+      int minJetPair_1_jet1index = -1;
+      int minJetPair_1_jet2index = -1;
+
+      int minJetPair_2_jet1index = -1;
+      int minJetPair_2_jet2index = -1;
+
+      double minJetAngle1 = 1000;
+      double minJetAngle2 = 1000;
+
+      for(unsigned int i=0; i<jet4mom.size(); i++){
+        for(unsigned int j=i+1; j<jet4mom.size(); j++){
+          if(i==j) continue;
+          double angleInDegrees = getAngleInDegrees(jet4mom[i].angle(jet4mom[j]));
+
+          if(angleInDegrees < minJetAngle1){
+            minJetPair_2_jet1index = minJetPair_1_jet1index;
+            minJetPair_2_jet2index = minJetPair_1_jet2index;
+            minJetAngle2 = minJetAngle1;
+
+            minJetPair_1_jet1index = i;
+            minJetPair_1_jet2index = j;
+            minJetAngle1 = angleInDegrees;
+          }
+          else if(angleInDegrees < minJetAngle2){
+            minJetPair_2_jet1index = i;
+            minJetPair_2_jet2index = j;
+            minJetAngle2 = angleInDegrees;
+          }
+        }
+      }
+
+      //Apply cut that the smallest angles must be less than 100 degrees
+      if(minJetAngle1 > 100) vetoEvent;
+      if(minJetAngle2 > 100) vetoEvent;
+
+
+      //Cut if the pairs of jets are too wide
+      _h_cutflow->fill(3);
+
+      // These two angles don't share a jet
+      // Not sure if we should veto the event, or just find another pairing,
+      // but we are assuming we veto the event
+      if( minJetPair_1_jet1index ==  minJetPair_2_jet1index || minJetPair_1_jet1index ==  minJetPair_2_jet2index ||
+          minJetPair_1_jet2index ==  minJetPair_2_jet1index || minJetPair_1_jet2index ==  minJetPair_2_jet2index){
+         vetoEvent;
+      }
+
+      //Cut if jets are not distinct pairs
+      _h_cutflow->fill(4);
+
+      //Note: First two are from the same W, next 2 are the other W
+      fastjet::PseudoJet correctJetPair1 = selectedJets[index1] + selectedJets[index2];
+      fastjet::PseudoJet correctJetPair2 = selectedJets[index3] + selectedJets[index4];
+      _h_dijetMass1->fill(correctJetPair1.m());
+      _h_dijetMass2->fill(correctJetPair2.m());
+      _h_mult_after->fill(particles.size());
+
+      //if(correctJetPair1.m() < 70 || correctJetPair1.m() >90 || correctJetPair2.m() < 70 || correctJetPair2.m() >90) vetoEvent;
+      
+      // We have passed the full cutflow now
+
+      // We have already ordered them, so we don't need to do this again
+      std::vector<int> ordered_indices = {index1,index2,index3,index4};
+      
+      for(unsigned int i=0; i<ordered_indices.size(); i++){
+        check_index->fill(ordered_indices[i]);
+      }
+
+      //Parton Comparison Graph/ Truth particle analysis from Iza
+      //Iza's ordering scheme
+      //  Order Wp quarks by pT
+      if (WpQuarks[1].pT() > WpQuarks[0].pT())
+        std::swap(WpQuarks[0], WpQuarks[1]);
+
+      Particle q1 = WpQuarks[0];
+      Particle q2 = WpQuarks[1];
+
+      // Pick q3 based on min dR to q1
+      double dR0 = deltaR(q1.momentum(), WmQuarks[0].momentum());
+      double dR1 = deltaR(q1.momentum(), WmQuarks[1].momentum());
+
+      Particle q3 = (dR0 < dR1 ? WmQuarks[0] : WmQuarks[1]);
+      Particle q4 = (dR0 < dR1 ? WmQuarks[1] : WmQuarks[0]);
+      std::vector<Particle> truth_quarks = {q1,q2,q3,q4};
+
+      //Checking invariant mass of quarks
+      double massWp = (q1.momentum() + q2.momentum()).mass();
+      double massWm = (q3.momentum() + q4.momentum()).mass();
+
+      quarkMassWp -> fill(massWp);
+      quarkMassWm -> fill(massWm);
+
+      // Note that this region matching is different than what is implemented for reco level
+      // I'm assuming part of this motivation is because we know which W is which?
+      //Added to match region graphs
+      // Setup 4-momentum
+      FourMomentum fv_q1(q1.E(), q1.px(), q1.py(), q1.pz());
+      FourMomentum fv_q2(q2.E(), q2.px(), q2.py(), q2.pz());
+      FourMomentum fv_q3(q3.E(), q3.px(), q3.py(), q3.pz());
+      FourMomentum fv_q4(q4.E(), q4.px(), q4.py(), q4.pz());
+      FourMomentum fv_Wp(Wp->momentum().e(), Wp->momentum().px(), Wp->momentum().py(), Wp->momentum().pz());
+      FourMomentum fv_Wm(Wm->momentum().e(), Wm->momentum().px(), Wm->momentum().py(), Wm->momentum().pz());
+
+      std::vector<FourMomentum> momentaList = {fv_q1, fv_q2, fv_q3, fv_q4, fv_q1};
+      double angleWpDeg = getAngleInDegrees(fv_q1.angle(fv_q2));
+      double angleWmDeg = getAngleInDegrees(fv_q3.angle(fv_q4));
+
+      if (angleWpDeg > 100.0 && angleWpDeg < 140.0 && angleWmDeg > 100.0 && angleWmDeg < 140.0) {
+        for (int i = 0; i < 4; ++i) {
+          double deg_theta = momentaList[i].angle(momentaList[(i+1)%(truth_quarks.size())]) * 180/3.14;
+          regionsQ[i]->fill(deg_theta);
+        }
+      }
+
+      //Now we need 4 histograms, one for each quark, comparing its deltaR to the jets
+      for(int i = 0; i <truth_quarks.size(); ++i){
+        double minDR = 1000;
+        double matchedJetIndex = -1;
+
+        //Finds smallest deltaR between a truth quark and any jet
+        for(int j = 0; j < selectedJets.size(); j++){
+          double deltaR1 = deltaR(truth_quarks[i].momentum(),jet4mom[j]);
+          if(deltaR1 < minDR){
+            minDR = deltaR1;
+            matchedJetIndex = j;
+          }
+        }
+
+        histos[i]->fill(minDR);
+
+        //for the first quark, we found the jet cooresponding to minimum delta R
+        //We then graph the deltaR of the other quark and jet
+        // JKR: I might have messed this up, so sorry about that. I was quite confused about what the code was doing...
+        for(int j = 0; j < selectedJets.size(); ++j){
+          if(j==matchedJetIndex) continue;
+          mismatchDeltaR -> fill(deltaR(jet4mom[matchedJetIndex],truth_quarks[i].momentum()));
+        }
+
+        //Checking ratio of quark pT to jet pT
+        // TODO shouldn't we just do this for the case where it is matched?
+        histosRatio[i]->fill(truth_quarks[i].pT()/jet4mom[matchedJetIndex].pT());
+
+        //Check dR between quarks
+        quarkdR[i]->fill(deltaR(truth_quarks[i],truth_quarks[(i+1)%truth_quarks.size()]));
+      }
+
+
+
+      // Want to check that all jets are matched to a truth quark
+      // This could be improved by requiring unique matches,
+      // but I think it is probably fine for most cases
+      bool allJetsMatched = true;
+      //Now we need 4 histograms, one for each quark, comparing its deltaR to the jets
+      for(int j = 0; j < selectedJets.size(); j++){
+        bool isMatched = false;
+        for(int i = 0; i <truth_quarks.size(); ++i){
+          double deltaR1 = deltaR(truth_quarks[i].momentum(),jet4mom[j]);
+          if(deltaR1 < 0.05) isMatched = true;
+        }
+        if(!isMatched) allJetsMatched = false;
+      }
+
+     
+
+      // Two options for non-adjacent jet pairings, once we have selected the jets that make regions B and D
+      // j1_1 j2_1, j1_2 j2_2
+      double angle1_1 = getAngleInDegrees(jet4mom[minJetPair_1_jet1index].angle(jet4mom[minJetPair_2_jet1index]));
+      double angle1_2 = getAngleInDegrees(jet4mom[minJetPair_1_jet2index].angle(jet4mom[minJetPair_2_jet2index]));
+      double sumAngles1 = (angle1_1 > 100 && angle1_1 < 140 && angle1_2 > 100 && angle1_2 < 140)? angle1_1 + angle1_2:0;
+
+      // j1_1 j2_2, j1_2 j2_1
+      double angle2_1 = getAngleInDegrees(jet4mom[minJetPair_1_jet1index].angle(jet4mom[minJetPair_2_jet2index]));
+      double angle2_2 = getAngleInDegrees(jet4mom[minJetPair_1_jet2index].angle(jet4mom[minJetPair_2_jet1index]));
+      double sumAngles2 = (angle2_1 > 100 && angle2_1 < 140 && angle2_2 > 100 && angle2_2 < 140)?angle2_1 + angle2_2:0;
+
+      // One of the pairings must pass the selection
+      if(sumAngles1==0 && sumAngles2==0) vetoEvent;
+      //cut if the jets don't fit expected geometry
+      _h_cutflow->fill(5);
+
+      int index1, index2, index3, index4;
+      // Use the pairing based on the larger sum of angles
+      // Jets 1-2 form region A (largest angle)
+      // Jets 2-3 form region B (smallest angle, which must be from minJetPair_1 by definition)
+      // Jets 3-4 form region C (second-largest angle)
+      // Jets 4-1 form region D (second-smallest angle, which must be from minJetPair_2 by definition)
+      if(sumAngles1 > sumAngles2){
+        if(angle1_2 > angle1_1){
+          index2 = minJetPair_1_jet2index;
+          index3 = minJetPair_1_jet1index;
+          index4 = minJetPair_2_jet1index;
+          index1 = minJetPair_2_jet2index;
+          orderingChoice->fill(0);
+          if(allJetsMatched){
+            orderingChoice_allMatched->fill(0);
+          }
+        }
+        else{
+          index2 = minJetPair_1_jet1index;
+          index3 = minJetPair_1_jet2index;
+          index4 = minJetPair_2_jet2index;
+          index1 = minJetPair_2_jet1index;
+          orderingChoice->fill(1);
+          if(allJetsMatched){
+            orderingChoice_allMatched->fill(1);
+          }
+        }
+      }
+      else{
+        // Both of these versions look asymmetric, but in opposite ways,
+        // so I think they basically cancel each other out.
+        // I have not been able to figure out why though.
+
+        if(angle2_2 > angle2_1){
+          index2 = minJetPair_1_jet2index;
+          index3 = minJetPair_1_jet1index;
+          index4 = minJetPair_2_jet2index;
+          index1 = minJetPair_2_jet1index;
+          orderingChoice->fill(2);
+          if(allJetsMatched){
+            orderingChoice_allMatched->fill(2);
+          }
+        }
+        else{
+          index2 = minJetPair_1_jet1index;
+          index3 = minJetPair_1_jet2index;
+          index4 = minJetPair_2_jet1index;
+          index1 = minJetPair_2_jet2index;
+          orderingChoice->fill(3);
+          if(allJetsMatched){
+            orderingChoice_allMatched->fill(3);
+          }
+        }
+      }
+
+
+      // Pre-calculating stuff so we don't have to keep doing this every time
+      std::vector<Vector3> a_vec;
+      std::vector<Vector3> unit_n_vec;
+      std::vector<double> thetaRef_vec;
+      for (int i = 0; i < jet4mom.size(); i++) {
+          Vector3 a(selectedJets[ordered_indices[i]].px(), selectedJets[ordered_indices[i]].py(), selectedJets[ordered_indices[i]].pz());
+          // Need to make sure it wraps around cleanly
+          Vector3 b(selectedJets[ordered_indices[(i+1)%jet4mom.size()]].px(), selectedJets[ordered_indices[(i+1)%jet4mom.size()]].py(), selectedJets[ordered_indices[(i+1)%jet4mom.size()]].pz());
+
+          //First we will define a normal vector from a couple of 3-Vectors:
+          Vector3 n = a.cross(b);
+          double nmag = n.mod();
+          Vector3 unit_n = n / nmag;
+
+          //Calculate reference jet angle
+          double thetaRef = atan2(n.dot(unit_n), a.dot(b));
+          //double thetaRef = a.angle(b);
+          //std::cout << thetaRef << "\t" << a.angle(b) << std::endl;
+
+          a_vec.push_back(a);
+          unit_n_vec.push_back(unit_n); 
+          thetaRef_vec.push_back(thetaRef);
+
+          double deg_theta = getAngleInDegrees(a.angle(b));
+          regions[i]->fill(deg_theta);
+      }  
 
       //A quest for Figure 6
-
-      double angleA;
-      double angleB;
-      double angleC;
-      double angleD;
-
       //So we see how much we are double counting or not counting particles in the sort
       std::vector<int> particleSort(particles.size(), 0);
 
       //Calculating thetaRescaled for each particle and ensuring each is placed in 1 or less regions
       for (unsigned int j = 0; j < particles.size(); j++){
-        std::vector<double> sorter(4,0);
-        std::vector<double> rescaledAngle(4,0);
         Vector3 p(particles[j].px(), particles[j].py(), particles[j].pz());
 
-        for (int i = 0; i < 4; ++i) {
-          //First we will define a normal vector from a couple of 3 Vectors:
-          Vector3 a(selectedJets[ordered_indices[i]].px(), selectedJets[ordered_indices[i]].py(), selectedJets[ordered_indices[i]].pz());
-          Vector3 b(selectedJets[ordered_indices[i+1]].px(), selectedJets[ordered_indices[i+1]].py(), selectedJets[ordered_indices[i+1]].pz());
+        // sorter has the pt_to_plane for a given particle
+        std::vector<double> sorter(4,0);
+        // The rescaled angle for each region for this particle
+        std::vector<double> rescaledAngle(4,0);
 
-          Vector3 n = a.cross(b);
-          double nmag = n.mod();
-          Vector3 unit_n = n / nmag;
-
-          //Calculate refrence jet angle
-          double thetaRef = atan2(n.dot(unit_n), a.dot(b));
-          double deg_theta = a.angle(b) * 180/3.14;
-          Vector3 proj_p = p - unit_n * p.dot(unit_n);
-
-          if(j==0){
-            if(i==0)
-              angleA = deg_theta;
-            if(i==1)
-              angleB = deg_theta;
-            if(i==2)
-              angleC = deg_theta;
-            if(i==3)
-              angleD = deg_theta;
-          }
+        for (int i = 0; i < unit_n_vec.size(); i++) {
+          //Calculate refrence jet angle by subtracting off the component of the vector in the direction of the unit vector
+          Vector3 proj_p = p - unit_n_vec[i] * p.dot(unit_n_vec[i]);
 
           //Calculate angles with a as the reference jet
-          double theta_p = atan2(a.cross(proj_p).dot(unit_n), a.dot(proj_p));
-          //Find transverse momentum
-          double pT_to_plane = std::abs(p.dot(unit_n));
+          double theta_p = atan2(a_vec[i].cross(proj_p).dot(unit_n_vec[i]), a_vec[i].dot(proj_p));
+          //double theta_p = a_vec[i].angle(proj_p);
+          //std::cout << theta_p << "\t" << atan2(a_vec[i].cross(proj_p).dot(unit_n_vec[i]), a_vec[i].dot(proj_p)) << std::endl;
+
+          //Find transverse momentum 
+          double pT_to_plane = std::abs(p.dot(unit_n_vec[i]));
 
           //if its in the region, have sorter write it down
-          if ((0 < theta_p && theta_p < thetaRef) || (0 > theta_p && theta_p > thetaRef)){
+          if ( (0 < theta_p && theta_p < thetaRef_vec[i])){
             sorter[i] = pT_to_plane;
-            rescaledAngle[i] = (theta_p/thetaRef);
+            rescaledAngle[i] = (theta_p/thetaRef_vec[i]);
           }
         }
 
         double minVal = 1000;
         int jetNum = -1;
+        double bestRescaledAngle = -1000;
         for(int k=0; k<4; ++k){
           if(sorter[k]!=0 && minVal>sorter[k]){
             minVal = sorter[k];
+            bestRescaledAngle = rescaledAngle[k];
             jetNum = k;
           }
         }
+        if(jetNum ==-1) continue;
 
-        if(jetNum != -1){
-          particleSort[j]++;
-          phi_rescaled->fill(rescaledAngle[jetNum]+jetNum);
+        particleSort[j]++;
+        phi_rescaled->fill(bestRescaledAngle+jetNum);
 
-          //Check if inside or outside region and fill cooresponding histo
-          if (jetNum == 0 || jetNum == 2){
-            insideTotal->fill(rescaledAngle[jetNum]);
+        //Check if inside or outside region and fill corresponding histo
+        //regionA
+        if (jetNum==0){
+          inside1->fill(bestRescaledAngle);
+          insideTotal->fill(bestRescaledAngle);
+          if(allJetsMatched){
+            inside1_allMatched->fill(bestRescaledAngle);
+            insideTotal_allMatched->fill(bestRescaledAngle);
           }
-          if (jetNum == 1 || jetNum == 3){
-            OutsideTotal->fill(rescaledAngle[jetNum]);
+        }
+        //RegionB
+        if (jetNum==1){
+          outside1->fill(bestRescaledAngle);
+          outsideTotal->fill(bestRescaledAngle);
+          if(allJetsMatched){
+            outside1_allMatched->fill(bestRescaledAngle);
+            outsideTotal_allMatched->fill(bestRescaledAngle);
           }
-          //regionA
-          if (jetNum==0)
-            inside1->fill(rescaledAngle[jetNum]);
-          //RegionB
-          if (jetNum==1)
-            outside1->fill(rescaledAngle[jetNum]);
-          //RegionC
-          if (jetNum==2)
-            inside2->fill(rescaledAngle[jetNum]);
-          //RegionD
-          if (jetNum==3)
-            outside2->fill(rescaledAngle[jetNum]);
+        }
+        //RegionC
+        if (jetNum==2){
+          inside2->fill(bestRescaledAngle);
+          insideTotal->fill(bestRescaledAngle);
+          if(allJetsMatched){
+            inside2_allMatched->fill(bestRescaledAngle);
+            insideTotal_allMatched->fill(bestRescaledAngle);
+          }
+        }
+        //RegionD
+        if (jetNum==3){
+          outside2->fill(bestRescaledAngle);
+          outsideTotal->fill(bestRescaledAngle);
+          if(allJetsMatched){
+            outside2_allMatched->fill(bestRescaledAngle);
+            outsideTotal_allMatched->fill(bestRescaledAngle);
+          }
         }
       }
-      //Angle in degrees between each jet
-      regionA->fill(angleA);
-      regionB->fill(angleB);
-      regionC->fill(angleC);
-      regionD->fill(angleD);
 
       for (int i = 0; i<particles.size(); i++){
         sorted->fill(particleSort[i]);
       }
+      writeEvent(correctJetPair1, correctJetPair2, fv_Wp, fv_Wm, fv_q1, fv_q2, fv_q3, fv_q4, massWp, massWm, selectedJets, ordered_indices);
+
     }
 
     /// Normalise histograms etc., after the run
@@ -666,39 +699,33 @@ namespace Rivet {
       normalize(_h_selectedJets);
       normalize(_h_mult_before);
       normalize(_h_mult_after);
+      normalize(orderingChoice);
       scale(phi_rescaled, 1.0 / sumOfWeights());
+
+      scale(inside1, 1.0 / sumOfWeights());
+      scale(outside1, 1.0 / sumOfWeights());
+      scale(inside1_allMatched, 1.0 / sumOfWeights());
+      scale(outside1_allMatched, 1.0 / sumOfWeights());
+
+      scale(inside2, 1.0 / sumOfWeights());
+      scale(outside2, 1.0 / sumOfWeights());
+      scale(inside2_allMatched, 1.0 / sumOfWeights());
+      scale(outside2_allMatched, 1.0 / sumOfWeights());
+
       scale(insideTotal, 1.0 / sumOfWeights());
-      scale(OutsideTotal, 1.0 / sumOfWeights());
+      scale(outsideTotal, 1.0 / sumOfWeights());
+      scale(insideTotal_allMatched, 1.0 / sumOfWeights());
+      scale(outsideTotal_allMatched, 1.0 / sumOfWeights());
 
       //Find actual ratio for figure 6
-
-      for (size_t i = 0; i < insideTotal->numBins(); ++i) {
-          
-          // Get the bin content
-          double insideValue  = insideTotal->bin(i).sumW();
-          double outsideValue = OutsideTotal->bin(i).sumW();
-
-          // Compute the ratio safely
-          double ratio = (outsideValue != 0) ? insideValue / outsideValue : 0;
-
-          // Fill the ratio into the corresponding bin of region_ratio
-          region_ratio->fillBin(i, ratio);
-      } 
-
-      for (unsigned int i = 0; i < inside1->numBins(); ++i) {
-        double inside1Value  = inside1->bin(i).sumW();
-        double inside2Value = inside2->bin(i).sumW();
-        double outside1Value = outside1->bin(i).sumW();
-        double outside2Value = outside2->bin(i).sumW();
-
-        // Compute the ratio safely
-        double in_ratio = (inside2Value != 0) ? inside1Value / inside2Value : 0;
-        double out_ratio = (outside2Value != 0) ? outside1Value / outside2Value : 0;
-
-        // Fill the ratio into the corresponding bin of region_ratio
-        inside_ratio->fillBin(i, in_ratio);
-        outside_ratio->fillBin(i, out_ratio);
-      }
+      divide(*insideTotal, *outsideTotal, region_ratio);
+      divide(*inside1, *inside2, inside_ratio);
+      divide(*outside1, *outside2, outside_ratio);
+    
+      divide(*insideTotal_allMatched, *outsideTotal_allMatched, region_ratio_allMatched);
+      divide(*inside1_allMatched, *inside2_allMatched, inside_ratio_allMatched);
+      divide(*outside1_allMatched, *outside2_allMatched, outside_ratio_allMatched);
+    
     }
 
     bool m_debug = false;
@@ -713,7 +740,6 @@ namespace Rivet {
 
     const double m_jetRadius = 0.7;
 
-    //std::vector<Histo1DPtr> _h_dijetMasses;
     Histo1DPtr _h_dijetMass1;
     Histo1DPtr _h_dijetMass2;
 
@@ -736,27 +762,43 @@ namespace Rivet {
 
     //Figure 5, ratio between particle count inside/outside
     Histo1DPtr insideTotal;
-    Histo1DPtr OutsideTotal;
-    Histo1DPtr region_ratio;
+    Histo1DPtr outsideTotal;
+    //Figure 5, but requiring match between each jet and a truth quark
+    Histo1DPtr insideTotal_allMatched;
+    Histo1DPtr outsideTotal_allMatched;
+
+    Scatter2DPtr region_ratio;
+    Scatter2DPtr inside_ratio;
+    Scatter2DPtr outside_ratio;
+
+    Scatter2DPtr region_ratio_allMatched;
+    Scatter2DPtr inside_ratio_allMatched;
+    Scatter2DPtr outside_ratio_allMatched;
 
     //Diagnostic plots
     Histo1DPtr _h_mult_nocut;
-    Histo1DPtr outside_ratio;
-    Histo1DPtr inside_ratio;
+
     Histo1DPtr inside1;
     Histo1DPtr inside2;
     Histo1DPtr outside1;
     Histo1DPtr outside2;
 
+    Histo1DPtr inside1_allMatched;
+    Histo1DPtr inside2_allMatched;
+    Histo1DPtr outside1_allMatched;
+    Histo1DPtr outside2_allMatched;
+
     Histo1DPtr regionA;
     Histo1DPtr regionB;
     Histo1DPtr regionC;
     Histo1DPtr regionD;
+    std::vector<Histo1DPtr> regions;
 
     Histo1DPtr quark1;
     Histo1DPtr quark2;
     Histo1DPtr quark3;
     Histo1DPtr quark4;
+    std::vector<Particle> truth_quarks;
 
     Histo1DPtr mismatchDeltaR;
 
@@ -771,18 +813,19 @@ namespace Rivet {
     Histo1DPtr quarkdR2;
     Histo1DPtr quarkdR3;
     Histo1DPtr quarkdR4;
+    std::vector<Histo1DPtr> quarkdR;
 
     Histo1DPtr regionQA;
     Histo1DPtr regionQB;
     Histo1DPtr regionQC;
     Histo1DPtr regionQD;
+    std::vector<Histo1DPtr> regionsQ;
 
-    Histo1DPtr region_a_thetaRescaled;
-    Histo1DPtr region_b_thetaRescaled;
-    Histo1DPtr region_c_thetaRescaled;
-    Histo1DPtr region_d_thetaRescaled;
+    Histo1DPtr orderingChoice;
 
     Histo1DPtr sorted;
+    std::vector<Histo1DPtr> histos;
+    std::vector<Histo1DPtr> histosRatio;
 
     std::ofstream* out;
   };
