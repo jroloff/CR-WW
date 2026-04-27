@@ -63,10 +63,10 @@ namespace Rivet {
       // The basic final-state projection: all final-state particles within the given eta acceptance
       // 10 degrees < theta < 170 degrees
       const FinalState fs(Cuts::abseta < 2.4 && Cuts::pT > 0.1*GeV);
+      //const FinalState fs(Cuts::abseta < 5 && Cuts::pT > 0.1*GeV);
+      // Trying 20 degrees < theta < 160 degrees
+      //const FinalState fs(Cuts::abseta < 1.75 && Cuts::pT > 0.1*GeV);
       declare(fs, "particles");
-
-      ChargedFinalState tracks(Cuts::pT > 0.2*GeV && Cuts::abseta < m_maxEtaTracks);
-      declare(tracks, "tracks");
 
       ////////////////////////////////////////////////////////////////////////////////////////////////
       // Book histograms
@@ -82,7 +82,7 @@ namespace Rivet {
 
       // One histogram for tracking what particles are left after cuts
       std::string cutflow = "Cutflow";
-      book(_h_cutflow, cutflow, 5, 0.5, 5.5);
+      book(_h_cutflow, cutflow, 10, 0.5, 10.5);
 
       //ycut before event vetoes
       book(_h_ycutAll, "ycutAll", 60, 1e-6, 0.5);
@@ -106,7 +106,6 @@ namespace Rivet {
       book(orderingChoice_allMatched, "orderingChoice_allMatched", 4, -0.5, 3.5);
       book(isMatched, "isMatched", 2, -0.5, 1.5);
 
-      book(mismatchDeltaR, "Matching_DeltaR", 50, 0, 3);
       book(check_index, "check_index", 6, -1, 5);
       book(sorted, "Sorted_particles", 13, -0.5, 12.5);
 
@@ -136,6 +135,10 @@ namespace Rivet {
 
       std::vector<std::string> regionNames = {"A", "B", "C", "D"};
       for(unsigned int i=0; i<4; i++){
+        Histo1DPtr regionPtRatio;
+        book(regionPtRatio, "regionPtRatios_Region_"+ regionNames[i], 50, 0.0, 3);
+        regionPtRatios.push_back(regionPtRatio);
+
         Histo1DPtr region;
         book(region, "Region_"+ regionNames[i], 72, -0.5, 180.5);
         regions.push_back(region);
@@ -245,8 +248,12 @@ namespace Rivet {
         book(inside_ratio_allMatchedTmp, "Inside_Ratio_allMatched_Pairing_" + to_string(j));
         inside_ratio_allMatched_byPairing.push_back(inside_ratio_allMatchedTmp);
 
-        std::vector<Histo1DPtr> regionsTmp, jetPtsTmp, jetThetasTmp;
+        std::vector<Histo1DPtr> regionsTmp, jetPtsTmp, jetThetasTmp, regionPtRatiosTmp;
         for(unsigned int i=0; i<4; i++){
+          Histo1DPtr regionPtRatio;
+          book(regionPtRatio, "regionPtRatios_Region_"+ regionNames[i] + "_Pairing_" + to_string(j), 50, 0.0, 3);
+          regionPtRatiosTmp.push_back(regionPtRatio);
+
           Histo1DPtr region;
           book(region, "Region_"+ regionNames[i] + "_Pairing_"+to_string(j), 72, -0.5, 180.5);
           regionsTmp.push_back(region);
@@ -262,9 +269,8 @@ namespace Rivet {
         regions_byPairing.push_back(regionsTmp);
         jetPts_byPairing.push_back(jetPtsTmp);
         jetThetas_byPairing.push_back(jetThetasTmp);
+        regionPtRatios_byPairing.push_back(regionPtRatiosTmp);
       }
-
-
 
 
       out = new std::ofstream("outEventDisplay.csv");
@@ -287,7 +293,8 @@ namespace Rivet {
       }
       return false;
     }
-
+ 
+    // Write the kinematic information to an output file for plotting event displays etc
     void writeEvent(fastjet::PseudoJet correctJetPair1, fastjet::PseudoJet correctJetPair2, FourMomentum fv_Wp, FourMomentum fv_Wm, FourMomentum fv_q1, FourMomentum fv_q2, FourMomentum fv_q3, FourMomentum fv_q4,
                     double massWp, double massWm, std::vector<fastjet::PseudoJet> selectedJets, std::vector<int> ordered_indices){
       (*out) << "Event" << std::endl;
@@ -340,12 +347,13 @@ namespace Rivet {
 
       // Things we don't need right now, but might want later
       //double collisionE = sqrtS();
-      //const Particles& tracks = apply<ChargedFinalState>(event, "tracks").particlesByPt();
       const Particles& particles = apply<FinalState>(event, "particles").particles();
 
       //All events
       //Use event.weight() maybe to normalize
-      _h_cutflow->fill(1);
+      int count = 1;
+      _h_cutflow->fill(count);
+      count++;
       _h_mult_nocut->fill(particles.size());
 
       // Fastjet analysis - select algorithm and parameters
@@ -357,14 +365,18 @@ namespace Rivet {
       // Run Fastjet algorithm
       fastjet::ClusterSequence clustSeq(particles, *jetDef);
       int nJetMin = 4;
-      //clustSeq.exclusive_dmerge_max(nJetMin-1);
-      const std::vector<fastjet::PseudoJet> durjet = clustSeq.exclusive_jets(nJetMin);
+      const std::vector<fastjet::PseudoJet> durjet = sorted_by_pt(clustSeq.exclusive_jets(nJetMin));
+      //const std::vector<fastjet::PseudoJet> durjet = clustSeq.exclusive_jets(nJetMin);
 
       _h_mult_before->fill(particles.size());
 
       std::vector<fastjet::PseudoJet> selectedJets;
       // Just so we don't have to keep doing this conversion over and over
       std::vector<FourMomentum> jet4mom;
+
+      if(durjet.size() !=4) vetoEvent;
+      _h_cutflow->fill(count);
+      count++;
 
       //ycut calculation
       for(unsigned int i=0; i<durjet.size(); i++){
@@ -378,7 +390,10 @@ namespace Rivet {
           //Add ycut pre-veto
           _h_ycutAll->fill(ycut);
 
-          if(ycut < 0.005) {
+          //if(ycut < 0.005) {
+          if(ycut < 0.05) {
+          //if(ycut < 0.5) {
+          //if(ycut < 0.002) {
             selectedJets.push_back(jj);
             FourMomentum fv1 = FourVector(selectedJets[i].E(), selectedJets[i].px() , selectedJets[i].py(), selectedJets[i].pz());
             jet4mom.push_back(fv1);
@@ -391,6 +406,9 @@ namespace Rivet {
 
       // Need exactly 4 jets
       if (selectedJets.size() != 4) vetoEvent;
+      //Add event that survived 4-jet selection
+      _h_cutflow->fill(count);
+      count++;
 
       const HepMC3::GenEvent &ge = *event.genEvent();
       //  Find hard-scatter W bosons
@@ -425,24 +443,53 @@ namespace Rivet {
       //  Get quarks from W decays
       std::vector<Particle> WpQuarks, WmQuarks;
 
+      bool foundQuarks = false;
+      while(!foundQuarks && Wp->end_vertex())
+      for (const auto &q : Wp->end_vertex()->particles_out()){
+        if(PID::isQuark( q->pid())){
+          foundQuarks = true;
+          break;
+        }
+        if(std::abs(q->pid() )== 24){
+          Wp = q;
+          break;
+        }
+      }
+
+      foundQuarks = false;
+      while(!foundQuarks && Wm->end_vertex())
+      for (const auto &q : Wm->end_vertex()->particles_out()){
+        if(PID::isQuark( q->pid())){
+          foundQuarks = true;
+          break;
+        } 
+        if(std::abs(q->pid() )== 24){
+          Wm = q;
+          break;
+        } 
+      } 
+
       if (Wp->end_vertex()) {
         for (const auto &q : Wp->end_vertex()->particles_out())
           if (PID::isQuark(q->pid()))
             WpQuarks.push_back(Particle(q));
       }
+
       if (Wm->end_vertex()) {
         for (const auto &q : Wm->end_vertex()->particles_out())
           if (PID::isQuark(q->pid()))
             WmQuarks.push_back(Particle(q));
       }
+
       if (WpQuarks.size() != 2 || WmQuarks.size() != 2){
-        //std::cout << "Did not find enough quarks" << std::endl;
-        //std::cout << WpQuarks.size() << "\t" << WmQuarks.size() << std::endl;
-        return;
+        std::cout << "Did not find enough quarks" << std::endl;
+        std::cout << WpQuarks.size() << "\t" << WmQuarks.size() << "\t" << Wp->end_vertex()->particles_out().size() << "\t" << Wm->end_vertex()->particles_out().size() << std::endl;
+        vetoEvent;
       }
 
-      //Add event that survived 4-jet selection
-      _h_cutflow->fill(2);
+      //Add event that survived the truth-level selection
+      _h_cutflow->fill(count);
+      count++;
 
       // Two smallest angles < 100 degrees
       int minJetPair_1_jet1index = -1;
@@ -478,11 +525,12 @@ namespace Rivet {
 
       //Apply cut that the smallest angles must be less than 100 degrees
       if(minJetAngle1 > 100) vetoEvent;
+      _h_cutflow->fill(count);
+      count++;
+
       if(minJetAngle2 > 100) vetoEvent;
-
-
-      //Cut if the pairs of jets are too wide
-      _h_cutflow->fill(3);
+      _h_cutflow->fill(count);
+      count++;
 
       // These two angles don't share a jet
       // Not sure if we should veto the event, or just find another pairing,
@@ -491,9 +539,8 @@ namespace Rivet {
           minJetPair_1_jet2index ==  minJetPair_2_jet1index || minJetPair_1_jet2index ==  minJetPair_2_jet2index){
          vetoEvent;
       }
-
-      //Cut if jets are not distinct pairs
-      _h_cutflow->fill(4);
+      _h_cutflow->fill(count);
+      count++;
 
 
       
@@ -559,14 +606,6 @@ namespace Rivet {
 
         histos[i]->fill(minDR);
 
-        //for the first quark, we found the jet cooresponding to minimum delta R
-        //We then graph the deltaR of the other quark and jet
-        // JKR: I might have messed this up, so sorry about that. I was quite confused about what the code was doing...
-        for(int j = 0; j < selectedJets.size(); ++j){
-          if(j==matchedJetIndex) continue;
-          mismatchDeltaR -> fill(deltaR(jet4mom[matchedJetIndex],truth_quarks[i].momentum()));
-        }
-
         //Checking ratio of quark pT to jet pT
         // TODO shouldn't we just do this for the case where it is matched?
         histosRatio[i]->fill(truth_quarks[i].pT()/jet4mom[matchedJetIndex].pT());
@@ -617,8 +656,9 @@ namespace Rivet {
 
       // One of the pairings must pass the selection
       if(sumAngles1==0 && sumAngles2==0) vetoEvent;
-      //cut if the jets don't fit expected geometry
-      _h_cutflow->fill(5);
+      //cut if the jets don't fit expected geometry for the wide angles
+      _h_cutflow->fill(count);
+      count++;
       int pairing = -1;
 
       int index1, index2, index3, index4;
@@ -664,8 +704,9 @@ namespace Rivet {
         }
       }
       if(pairing < 0) vetoEvent;
-      std::cout << pairing << std::endl;
       // We have passed the full cutflow now
+      _h_cutflow->fill(count);
+      count++;
 
       // We have already ordered them, so we don't need to do this again
       std::vector<int> ordered_indices = {index1,index2,index3,index4};
@@ -691,7 +732,6 @@ namespace Rivet {
         orderingChoice_allMatched->fill(pairing);
       }
 
-
       _h_dijetMass1->fill(correctJetPair1.m());
       _h_dijetMass2->fill(correctJetPair2.m());
       if(allJetsMatched){
@@ -699,8 +739,6 @@ namespace Rivet {
         _h_dijetMass2_allMatched->fill(correctJetPair2.m());
       }
       _h_mult_after->fill(particles.size());
-
-      //vetoEvent;
 
       isMatched->fill(allJetsMatched);
 
@@ -833,6 +871,10 @@ namespace Rivet {
           }
         }
       }
+      for(unsigned int i=0; i<4; i++){
+        regionPtRatios[i]->fill(jet4mom[ordered_indices[i]].pt() / jet4mom[ordered_indices[(i+1)%4]].pt());
+        regionPtRatios_byPairing[pairing][i]->fill(jet4mom[ordered_indices[i]].pt() / jet4mom[ordered_indices[(i+1)%4]].pt());
+      }
 
       for (int i = 0; i<particles.size(); i++){
         sorted->fill(particleSort[i]);
@@ -895,16 +937,6 @@ namespace Rivet {
 
     bool m_debug = false;
 
-    // If you want to match LEP, you should use this value for the max track eta
-    //const double m_maxEtaTracks = 1.738; // Using cos(theta) < 0.94, which this should correspond to
-
-    // For these studies, currently studying the same eta cutoff for all paricles and for tracks
-    // This choice is somewhat arbitrary, and we could probably go higher in eta with future detectors
-    const double m_maxEtaTracks = 2.1;
-    const double m_maxEta = 2.1;
-
-    const double m_jetRadius = 0.7;
-
     Histo1DPtr _h_dijetMass1;
     Histo1DPtr _h_dijetMass2;
 
@@ -913,6 +945,8 @@ namespace Rivet {
 
     Histo1DPtr quarkMassWm;
     Histo1DPtr quarkMassWp;
+
+    //Diagnostic plots
 
     //Same thing, std::vector<Histo1DPtr> _h_cutflow;
     Histo1DPtr _h_cutflow;
@@ -924,9 +958,8 @@ namespace Rivet {
     Histo1DPtr _h_mult_before;
     //particle multiplicity after cuts
     Histo1DPtr _h_mult_after;
-
-    //Diagnostic plots
     Histo1DPtr _h_mult_nocut;
+    Histo1DPtr check_index;
 
     //Figure 6, particle flow per event in each region
     Histo1DPtr phi_rescaled;
@@ -993,23 +1026,19 @@ namespace Rivet {
     std::vector<Scatter2DPtr> outside_ratio_allMatched_byPairing;
             
 
-    std::vector<std::vector<Histo1DPtr> > regions_byPairing;
-    std::vector<std::vector<Histo1DPtr> > jetPts_byPairing;
-    std::vector<std::vector<Histo1DPtr> > jetThetas_byPairing;
-
-
-
     std::vector<Histo1DPtr> regions;
     std::vector<Histo1DPtr> jetPts;
     std::vector<Histo1DPtr> jetThetas;
+    std::vector<Histo1DPtr>  regionPtRatios;
+    std::vector<std::vector<Histo1DPtr> > regions_byPairing;
+    std::vector<std::vector<Histo1DPtr> > jetPts_byPairing;
+    std::vector<std::vector<Histo1DPtr> > jetThetas_byPairing;
+    std::vector<std::vector<Histo1DPtr> > regionPtRatios_byPairing;
+
 
     std::vector<Particle> truth_quarks;
     std::vector<Histo1DPtr> quarkdR;
     std::vector<Histo1DPtr> regionsQ;
-
-    Histo1DPtr mismatchDeltaR;
-
-    Histo1DPtr check_index;
 
 
     Histo1DPtr orderingChoice;
